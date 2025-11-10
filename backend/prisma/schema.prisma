@@ -1,0 +1,348 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - represents authenticated users
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  profileImage  String?
+  googleId      String?  @unique // For Google OAuth
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  organizations         UserOrganization[]
+  ownedContacts         Contact[]         @relation("ContactOwner")
+  ownedLeads            Lead[]            @relation("LeadOwner")
+  ownedTasks            Task[]            @relation("TaskOwner")
+  createdTasks          Task[]            @relation("TaskCreator")
+  activities            ActivityLog[]
+  tickets               Ticket[]
+  ticketMessages        TicketMessage[]
+
+  @@map("users")
+}
+
+// Organization model - represents companies/organizations
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  domain      String?
+  logo        String?
+  website     String?
+  industry    String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       UserOrganization[]
+  contacts    Contact[]
+  leads       Lead[]
+  tasks       Task[]
+  accounts    Account[]
+  roles       UserRole[]
+  activities  ActivityLog[]
+
+  @@map("organizations")
+}
+
+// Junction table for users and organizations with roles
+model UserOrganization {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           UserRoleType @default(VIEWER)
+  joinedAt       DateTime @default(now())
+
+  // Relations
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("user_organizations")
+}
+
+// Contact model - represents contact persons
+model Contact {
+  id             String    @id @default(cuid())
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  title          String?
+  department     String?
+  street         String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?
+  latitude       Float?
+  longitude      Float?
+  description    String?
+  ownerId        String?
+  organizationId String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  owner          User?         @relation("ContactOwner", fields: [ownerId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks          Task[]
+  leads          Lead[]
+
+  @@map("contacts")
+}
+
+// Lead model - represents sales leads
+model Lead {
+  id                    String     @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String?
+  phone                 String?
+  company               String?
+  title                 String?
+  status                LeadStatus @default(NEW)
+  leadSource            LeadSource @default(WEB)
+  industry              String?
+  rating                String?
+  description           String?
+  ownerId               String?
+  organizationId        String
+  contactId             String?
+  isConverted           Boolean    @default(false)
+  convertedAt           DateTime?
+  convertedAccountId    String?
+  convertedContactId    String?
+  convertedOpportunityId String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  // Relations
+  owner                 User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact               Contact?     @relation(fields: [contactId], references: [id])
+  tasks                 Task[]
+
+  @@map("leads")
+}
+
+// Task model - represents tasks/activities
+model Task {
+  id             String      @id @default(cuid())
+  subject        String
+  description    String?
+  status         TaskStatus  @default(NOT_STARTED)
+  priority       TaskPriority @default(NORMAL)
+  dueDate        DateTime?
+  ownerId        String?
+  createdById    String?
+  accountId      String?
+  contactId      String?
+  leadId         String?
+  opportunityId  String?
+  caseId         String?
+  organizationId String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  owner          User?        @relation("TaskOwner", fields: [ownerId], references: [id])
+  createdBy      User?        @relation("TaskCreator", fields: [createdById], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact        Contact?     @relation(fields: [contactId], references: [id])
+  lead           Lead?        @relation(fields: [leadId], references: [id])
+
+  @@map("tasks")
+}
+
+// Account model - represents company accounts
+model Account {
+  id             String   @id @default(cuid())
+  name           String
+  type           String
+  website        String?
+  phone          String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks          Task[]
+
+  @@map("accounts")
+}
+
+// UserRole model - represents roles and permissions
+model UserRole {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  roleType       UserRoleType
+  permissions    Permission[]
+  organizationId String
+  isDefault      Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@map("user_roles")
+}
+
+// ActivityLog model - for audit logging
+model ActivityLog {
+  id             String      @id @default(cuid())
+  action         String
+  entityType     String
+  entityId       String
+  description    String?
+  userId         String?
+  organizationId String
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  // Relations
+  user           User?         @relation(fields: [userId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+// Ticket model - for support tickets
+model Ticket {
+  id             String       @id @default(cuid())
+  subject        String
+  description    String?
+  status         TicketStatus @default(OPEN)
+  priority       TicketPriority @default(NORMAL)
+  category       String?
+  ownerId        String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  owner          User          @relation(fields: [ownerId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages       TicketMessage[]
+
+  @@map("tickets")
+}
+
+// TicketMessage model - messages within tickets
+model TicketMessage {
+  id        String   @id @default(cuid())
+  content   String
+  isInternal Boolean @default(false)
+  ticketId  String
+  authorId  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@map("ticket_messages")
+}
+
+// Enums
+enum UserRoleType {
+  ADMIN
+  MANAGER
+  AGENT
+  VIEWER
+}
+
+enum Permission {
+  VIEW_CONTACTS
+  CREATE_CONTACTS
+  EDIT_CONTACTS
+  DELETE_CONTACTS
+  VIEW_LEADS
+  CREATE_LEADS
+  EDIT_LEADS
+  DELETE_LEADS
+  CONVERT_LEADS
+  VIEW_TICKETS
+  CREATE_TICKETS
+  EDIT_TICKETS
+  DELETE_TICKETS
+  ASSIGN_TICKETS
+  RESOLVE_TICKETS
+  VIEW_TASKS
+  CREATE_TASKS
+  EDIT_TASKS
+  DELETE_TASKS
+  ASSIGN_TASKS
+  VIEW_DASHBOARD
+  VIEW_REPORTS
+  MANAGE_USERS
+  MANAGE_ROLES
+  MANAGE_ORGANIZATION
+  VIEW_AUDIT_LOGS
+}
+
+enum LeadStatus {
+  NEW
+  PENDING
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum LeadSource {
+  WEB
+  PHONE_INQUIRY
+  PARTNER_REFERRAL
+  COLD_CALL
+  TRADE_SHOW
+  EMPLOYEE_REFERRAL
+  ADVERTISEMENT
+  OTHER
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  HIGH
+  NORMAL
+  LOW
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}

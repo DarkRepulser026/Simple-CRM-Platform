@@ -1,0 +1,33 @@
+name: main_project
+description: "just want to make a CRM."
+
+publish_to: 'none'
+
+version: 1.0.0+9
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  cupertino_icons: ^1.0.8
+  flutter:
+    sdk: flutter
+  font_awesome_flutter: ^10.7.0
+  google_sign_in: ^7.1.1
+  http: ^1.1.0
+  intl: ^0.19.0
+  jwt_decoder: ^2.0.1
+  package_info_plus: ^8.0.2
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  equatable: ^2.0.5
+  flutter_launcher_icons: "^0.14.4"
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  mockito: ^5.4.4
+
+flutter:
+
+  uses-material-design: true
