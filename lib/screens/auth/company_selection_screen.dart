@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 import '../../services/auth/auth_service.dart';
-import '../../services/auth/auth_service_mock.dart';
-import '../../services/storage/secure_storage.dart';
+import '../../services/service_locator.dart';
 import '../../navigation/app_router.dart';
 
 /// Company/Organization selection screen
@@ -28,8 +27,7 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
   }
 
   Future<void> _initializeServices() async {
-    final storage = await SecureStorage.create();
-    _authService = AuthServiceMock(storage);
+    _authService = locator<AuthService>();
   }
 
   Future<void> _selectCompany(String companyId) async {

@@ -21,7 +21,7 @@ void main() {
     });
 
     test('should convert User to JSON', () {
-      const user = User(
+      final user = User(
         id: 'user-123',
         email: 'test@example.com',
         name: 'Test User',
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('should handle null profileImage', () {
-      const user = User(
+      final user = User(
         id: 'user-123',
         email: 'test@example.com',
         name: 'Test User',
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('should convert Organization to JSON', () {
-      const org = Organization(
+      final org = Organization(
         id: 'org-123',
         name: 'Test Organization',
         role: 'Admin',
@@ -79,7 +79,7 @@ void main() {
     });
 
     test('should handle null role', () {
-      const org = Organization(
+      final org = Organization(
         id: 'org-123',
         name: 'Test Organization',
       );

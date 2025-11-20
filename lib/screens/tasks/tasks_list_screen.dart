@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/task.dart';
 import '../../navigation/app_router.dart';
+import '../../services/tasks_service.dart';
+import '../../services/service_locator.dart';
 
 /// List screen for displaying and managing tasks with pagination
 class TasksListScreen extends StatefulWidget {
@@ -12,27 +14,25 @@ class TasksListScreen extends StatefulWidget {
 }
 
 class _TasksListScreenState extends State<TasksListScreen> {
+  late final TasksService _tasksService;
+  
+  @override
+  void initState() {
+    super.initState();
+    _tasksService = locator<TasksService>();
+  }
+  
+  
   Future<List<Task>> _fetchTasksPage(int page, int limit) async {
-    // TODO: Implement actual API call using TasksService
-    // For now, return mock data
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-
-    return List.generate(
-      limit,
-      (index) => Task(
-        id: 'task_${page}_${index}',
-        subject: 'Task ${(page - 1) * limit + index + 1}',
-        description: 'This is a sample task description for task ${(page - 1) * limit + index + 1}',
-        status: TaskStatus.values[index % TaskStatus.values.length],
-        priority: TaskPriority.values[index % TaskPriority.values.length],
-        dueDate: DateTime.now().add(Duration(days: index % 7)),
-        organizationId: 'org123',
-        createdAt: DateTime.now().subtract(Duration(days: index)),
-        updatedAt: DateTime.now().subtract(Duration(hours: index)),
-        ownerId: 'user123',
-        createdById: 'user123',
-      ),
-    );
+    try {
+      final res = await _tasksService.getTasks(page: page, limit: limit);
+      if (res.isSuccess) {
+        return res.value.tasks;
+      }
+      throw Exception(res.error.message);
+    } catch (e) {
+      throw Exception('Failed to load tasks: $e');
+    }
   }
 
   @override
@@ -291,3 +291,5 @@ class TaskDetailArgs {
   @override
   String toString() => 'TaskDetailArgs(taskId: $taskId)';
 }
+
+  

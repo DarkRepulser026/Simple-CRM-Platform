@@ -9,11 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:main_project/main.dart';
+import 'package:main_project/services/service_locator.dart';
 
 void main() {
   testWidgets('App builds and shows loading then navigates to login', (
     final WidgetTester tester,
   ) async {
+    // Ensure services are registered for the app
+    await setupLocator();
     // Build our app and trigger a frame.
     await tester.pumpWidget(const App());
 

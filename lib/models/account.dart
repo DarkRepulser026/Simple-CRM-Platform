@@ -5,6 +5,9 @@ class Account {
   final String type;
   final String? website;
   final String? phone;
+  final String organizationId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const Account({
     required this.id,
@@ -12,6 +15,9 @@ class Account {
     required this.type,
     this.website,
     this.phone,
+    required this.organizationId,
+    this.createdAt,
+    this.updatedAt,
   });
 
   /// Factory constructor to create Account from JSON
@@ -22,6 +28,9 @@ class Account {
       type: json['type'] ?? '',
       website: json['website'],
       phone: json['phone'],
+      organizationId: json['organizationId'] ?? '',
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
     );
   }
 
@@ -33,6 +42,9 @@ class Account {
       'type': type,
       'website': website,
       'phone': phone,
+      'organizationId': organizationId,
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
   }
 
@@ -43,6 +55,9 @@ class Account {
     String? type,
     Object? website = Object, // Special sentinel value
     Object? phone = Object, // Special sentinel value
+    String? organizationId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Account(
       id: id ?? this.id,
@@ -50,6 +65,9 @@ class Account {
       type: type ?? this.type,
       website: website == Object ? this.website : website as String?,
       phone: phone == Object ? this.phone : phone as String?,
+      organizationId: organizationId ?? this.organizationId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -62,15 +80,21 @@ class Account {
         other.name == name &&
         other.type == type &&
         other.website == website &&
+      other.organizationId == organizationId &&
+      other.createdAt == createdAt &&
+      other.updatedAt == updatedAt &&
         other.phone == phone;
   }
 
   @override
   int get hashCode {
     return id.hashCode ^
-        name.hashCode ^
-        type.hashCode ^
-        website.hashCode ^
-        phone.hashCode;
+      name.hashCode ^
+      type.hashCode ^
+      website.hashCode ^
+      phone.hashCode ^
+      organizationId.hashCode ^
+      createdAt.hashCode ^
+      updatedAt.hashCode;
   }
 }

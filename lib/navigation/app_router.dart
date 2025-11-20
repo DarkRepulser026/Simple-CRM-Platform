@@ -2,10 +2,30 @@ import 'package:flutter/material.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/company_selection_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/organizations/organizations_list_screen.dart';
 import '../screens/contacts/contacts_list_screen.dart';
+import '../screens/contacts/contact_create_screen.dart';
+import '../screens/contacts/contact_detail_screen.dart';
+import '../screens/contacts/contact_edit_screen.dart';
+import '../screens/accounts/accounts_list_screen.dart';
+import '../screens/accounts/account_create_screen.dart';
+import '../screens/accounts/account_detail_screen.dart';
 import '../screens/leads/leads_list_screen.dart';
+import '../screens/leads/lead_create_screen.dart';
+import '../screens/leads/lead_detail_screen.dart';
+import '../screens/leads/lead_edit_screen.dart';
+import '../screens/admin/users_list_screen.dart';
+import '../screens/admin/roles_list_screen.dart';
+import '../screens/admin/activity_logs_screen.dart';
+import '../screens/interactions/interactions_list_screen.dart';
 import '../screens/tasks/tasks_list_screen.dart';
+import '../screens/tasks/task_create_screen.dart';
+import '../screens/tasks/task_detail_screen.dart';
+import '../screens/tasks/task_edit_screen.dart';
 import '../screens/tickets/tickets_list_screen.dart';
+import '../screens/tickets/ticket_create_screen.dart';
+import '../screens/tickets/ticket_detail_screen.dart';
+import '../screens/tickets/ticket_edit_screen.dart';
 
 /// Typed route arguments for type-safe navigation
 class ContactDetailArgs {
@@ -41,14 +61,25 @@ class AppRouter {
   static const String about = '/about';
   static const String helpSupport = '/help-support';
   static const String contacts = '/contacts';
+  static const String organizations = '/organizations';
+  static const String accounts = '/accounts';
+  static const String accountDetail = '/accounts/detail';
+  static const String accountCreate = '/accounts/create';
   static const String leads = '/leads';
   static const String tickets = '/tickets';
   static const String contactCreate = '/contact-create';
   static const String contactDetail = '/contact-detail';
+  static const String contactEdit = '/contact-edit';
   static const String leadDetail = '/lead-detail';
   static const String leadCreate = '/lead-create';
+  static const String leadEdit = '/lead-edit';
   static const String ticketCreate = '/ticket-create';
   static const String ticketDetail = '/ticket-detail';
+  static const String ticketEdit = '/ticket-edit';
+  static const String adminUsers = '/admin/users';
+  static const String adminRoles = '/admin/roles';
+  static const String activityLogs = '/admin/activity-logs';
+  static const String interactions = '/interactions';
   static const String tasks = '/tasks';
   static const String taskCreate = '/task-create';
   static const String taskDetail = '/task-detail';
@@ -92,10 +123,20 @@ class AppRouter {
       companySelection: (context) => const CompanySelectionScreen(),
       dashboard: (context) => const DashboardScreen(),
       contacts: (context) => const ContactsListScreen(),
+      organizations: (context) => const OrganizationsListScreen(),
+      accounts: (context) => const AccountsListScreen(),
+      accountCreate: (context) => const AccountCreateScreen(),
       leads: (context) => const LeadsListScreen(),
+      taskCreate: (context) => const TaskCreateScreen(),
+      leadCreate: (context) => const LeadCreateScreen(),
       tasks: (context) => const TasksListScreen(),
       tickets: (context) => const TicketsListScreen(),
-      // contactCreate: (context) => const ContactCreateScreen(),
+      ticketCreate: (context) => const TicketCreateScreen(),
+      adminUsers: (context) => const UsersListScreen(),
+      adminRoles: (context) => const RolesListScreen(),
+      activityLogs: (context) => const ActivityLogsScreen(),
+      interactions: (context) => const InteractionsListScreen(),
+      contactCreate: (context) => const ContactCreateScreen(),
       // contactDetail: (context) => const ContactDetailScreen(),
       // leadCreate: (context) => const LeadCreateScreen(),
       // leadDetail: (context) => const LeadDetailScreen(),
@@ -108,46 +149,71 @@ class AppRouter {
   /// Handle onGenerateRoute for dynamic routes with arguments
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+            case accountDetail:
+              final args = settings.arguments as AccountDetailArgs?;
+              if (args != null) {
+                return MaterialPageRoute(
+                  builder: (context) => AccountDetailScreen(accountId: args.accountId),
+                );
+              }
+              break;
       case contactDetail:
         final args = settings.arguments as ContactDetailArgs?;
         if (args != null) {
-          // TODO: return MaterialPageRoute(
-          //   builder: (context) => ContactDetailScreen(contactId: args.contactId),
-          // );
+          return MaterialPageRoute(
+            builder: (context) => ContactDetailScreen(contactId: args.contactId),
+          );
         }
         break;
+        case contactEdit:
+          final ca = settings.arguments as ContactEditArgs?;
+          if (ca != null) {
+            return MaterialPageRoute(builder: (context) => ContactEditScreen(contactId: ca.contactId));
+          }
+          break;
       case leadDetail:
         final args = settings.arguments as LeadDetailArgs?;
         if (args != null) {
-          // TODO: return MaterialPageRoute(
-          //   builder: (context) => LeadDetailScreen(leadId: args.leadId),
-          // );
+          return MaterialPageRoute(
+            builder: (context) => LeadDetailScreen(leadId: args.leadId),
+          );
+        }
+        break;
+      case leadEdit:
+        final args = settings.arguments as LeadEditArgs?;
+        if (args != null) {
+          return MaterialPageRoute(builder: (context) => LeadEditScreen(leadId: args.leadId));
         }
         break;
       case taskDetail:
         final args = settings.arguments as TaskDetailArgs?;
         if (args != null) {
-          // TODO: return MaterialPageRoute(
-          //   builder: (context) => TaskDetailScreen(taskId: args.taskId),
-          // );
+          return MaterialPageRoute(
+            builder: (context) => TaskDetailScreen(taskId: args.taskId),
+          );
+        }
+        break;
+      case taskEdit:
+        final args = settings.arguments as TaskEditArgs?;
+        if (args != null) {
+          return MaterialPageRoute(builder: (context) => TaskEditScreen(taskId: args.taskId));
         }
         break;
       case ticketDetail:
         final args = settings.arguments as TicketDetailArgs?;
         if (args != null) {
-          // TODO: return MaterialPageRoute(
-          //   builder: (context) => TicketDetailScreen(ticketId: args.ticketId),
-          // );
+          return MaterialPageRoute(
+            builder: (context) => TicketDetailScreen(ticketId: args.ticketId),
+          );
         }
         break;
-      case taskEdit:
-        final args = settings.arguments as TaskDetailArgs?;
+      case ticketEdit:
+        final args = settings.arguments as TicketEditArgs?;
         if (args != null) {
-          // TODO: return MaterialPageRoute(
-          //   builder: (context) => TaskEditScreen(taskId: args.taskId),
-          // );
+          return MaterialPageRoute(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
         }
         break;
+      
     }
     return null;
   }

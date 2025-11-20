@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/dashboard_metrics.dart';
 import '../../services/auth/auth_service.dart';
-import '../../services/auth/auth_service_mock.dart';
-import '../../services/storage/secure_storage.dart';
+import '../../services/service_locator.dart';
+import '../../services/dashboard_service.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../navigation/app_router.dart';
@@ -17,6 +17,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late final AuthService _authService;
+  late final DashboardService _dashboardService;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -29,8 +30,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initializeServices() async {
-    final storage = await SecureStorage.create();
-    _authService = AuthServiceMock(storage);
+    _authService = locator<AuthService>();
+    _dashboardService = locator<DashboardService>();
     await _loadDashboard();
   }
 
@@ -41,53 +42,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      // TODO: Implement dashboard service call
-      // For now, create mock data
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-
-      setState(() {
-        _metrics = const DashboardMetrics(
-          totalContacts: 1250,
-          totalLeads: 89,
-          totalOpportunities: 45,
-          totalAccounts: 12,
-          pendingTasks: 34,
-          opportunityRevenue: 456780.50,
-          totalTickets: 156,
-          openTickets: 42,
-          pendingTickets: 18,
-          resolvedTickets: 89,
-          overdueTickets: 7,
-          ticketsByStatus: {
-            'Open': 42,
-            'Pending': 18,
-            'In Progress': 15,
-            'Resolved': 89,
-            'Closed': 10,
-          },
-          ticketsByAgent: {
-            'agent1': 25,
-            'agent2': 32,
-            'agent3': 28,
-            'agent4': 19,
-          },
-          ticketsByPriority: {
-            'Low': 45,
-            'Normal': 67,
-            'High': 32,
-            'Urgent': 8,
-            'Critical': 4,
-          },
-          averageCsat: 4.2,
-          averageNps: 35.5,
-          totalSatisfactionResponses: 89,
-          averageFirstResponseTime: 2.3,
-          averageResolutionTime: 18.5,
-          averageResponseTime: 1.8,
-          slaComplianceRate: 87.3,
-        );
-        _isLoading = false;
-      });
+      final res = await _dashboardService.getDashboardMetrics();
+      if (res.isSuccess) {
+        setState(() {
+          _metrics = res.value;
+          _isLoading = false;
+        });
+        return;
+      }
+      throw Exception(res.error.message);
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load dashboard: $e';
@@ -389,12 +352,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: Theme.of(context).colorScheme.secondary,
                 onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
               ),
-              _QuickActionCard(
+                _QuickActionCard(
                 title: 'Customer Interactions',
                 subtitle: 'Log and track customer interactions',
                 icon: Icons.people_outline,
                 color: Theme.of(context).colorScheme.tertiary,
-                onTap: () => AppRouter.navigateTo(context, AppRouter.contacts), // TODO: Create interactions screen
+                onTap: () => AppRouter.navigateTo(context, AppRouter.interactions),
               ),
               _QuickActionCard(
                 title: 'View Reports',
@@ -480,6 +443,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+          ),
+          const SizedBox(height: 16),
+          ListTile(
+            leading: Icon(Icons.business, color: Theme.of(context).colorScheme.primary),
+            title: const Text('Organizations'),
+            onTap: () => AppRouter.navigateTo(context, AppRouter.organizations),
+          ),
+          ListTile(
+            leading: Icon(Icons.account_balance, color: Theme.of(context).colorScheme.primary),
+            title: const Text('Accounts'),
+            onTap: () => AppRouter.navigateTo(context, AppRouter.accounts),
+          ),
+          ListTile(
+            leading: Icon(Icons.history, color: Theme.of(context).colorScheme.primary),
+            title: const Text('Activity Logs'),
+            onTap: () => AppRouter.navigateTo(context, AppRouter.activityLogs),
           ),
         ],
       ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/contact.dart';
 import '../../navigation/app_router.dart';
+import '../../services/contacts_service.dart';
+import '../../services/service_locator.dart';
 
 /// List screen for displaying and managing contacts with pagination
 class ContactsListScreen extends StatefulWidget {
@@ -12,24 +14,18 @@ class ContactsListScreen extends StatefulWidget {
 }
 
 class _ContactsListScreenState extends State<ContactsListScreen> {
+  late final ContactsService _contactsService;
   Future<List<Contact>> _fetchContactsPage(int page, int limit) async {
-    // TODO: Implement actual API call using ContactsService
-    // For now, return mock data
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-
-    return List.generate(
-      limit,
-      (index) => Contact(
-        id: 'contact_${page}_${index}',
-        firstName: 'Contact',
-        lastName: '${(page - 1) * limit + index + 1}',
-        organizationId: 'org123',
-        createdAt: DateTime.now().subtract(Duration(days: index)),
-        updatedAt: DateTime.now().subtract(Duration(hours: index)),
-        email: 'contact${(page - 1) * limit + index + 1}@example.com',
-        phone: '+1-555-01${((page - 1) * limit + index + 1).toString().padLeft(4, '0')}',
-      ),
-    );
+    try {
+      final res = await _contactsService.getContacts(page: page, limit: limit);
+      if (res.isSuccess) {
+        return res.value.contacts;
+      }
+      throw Exception(res.error.message);
+    } catch (e) {
+      // Re-throw so PaginatedListView shows error state
+      throw Exception('Failed to load contacts: $e');
+    }
   }
 
   @override
@@ -75,6 +71,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
       AppRouter.contactDetail,
       arguments: ContactDetailArgs(contactId: contactId),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _contactsService = locator<ContactsService>();
   }
 }
 

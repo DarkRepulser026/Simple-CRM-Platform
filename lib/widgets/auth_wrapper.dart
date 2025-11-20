@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../navigation/app_router.dart';
+import '../services/service_locator.dart';
+import '../services/auth/auth_service.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -18,12 +20,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _initializeApp() async {
-    // TODO: Initialize auth service and check authentication state
-    await Future.delayed(const Duration(seconds: 2)); // Simulate initialization
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-      });
+    try {
+      // Service locator has been initialized in `main.dart`.
+      // Initialize auth service
+      final authService = locator<AuthService>();
+      await authService.initialize();
+
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing app: $e');
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     }
   }
 
@@ -47,10 +61,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // TODO: Check authentication status and organization selection
-    // For now, navigate to login screen
+    // Check authentication status and organization selection
+    final authService = locator<AuthService>();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AppRouter.replaceWith(context, AppRouter.login);
+      if (authService.isLoggedIn) {
+        if (authService.hasSelectedOrganization) {
+          AppRouter.replaceWith(context, AppRouter.dashboard);
+        } else {
+          AppRouter.replaceWith(context, AppRouter.companySelection);
+        }
+      } else {
+        AppRouter.replaceWith(context, AppRouter.login);
+      }
     });
 
     return const SizedBox.shrink(); // Placeholder while navigating

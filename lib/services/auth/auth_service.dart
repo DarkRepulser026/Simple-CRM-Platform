@@ -10,6 +10,9 @@ abstract class AuthService {
   /// Sign in with Google and obtain JWT token
   Future<bool> signInWithGoogle();
 
+  /// Sign in with Google using an ID token (for web)
+  Future<bool> signInWithGoogleIdToken(String idToken);
+
   /// Select an organization for the current user
   Future<void> selectOrganization(String organizationId);
 

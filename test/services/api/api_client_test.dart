@@ -67,9 +67,9 @@ void main() {
 
   group('ApiConfig', () {
     test('should have correct base URL', () {
-      // In test environment, this should use production URL
+      // In test environment, the base URL should be set or default to local dev URL; accept http or https
       expect(ApiConfig.baseUrl, isNotEmpty);
-      expect(ApiConfig.baseUrl, startsWith('https://'));
+      expect(ApiConfig.baseUrl, matches(RegExp(r'^https?://')));
     });
 
     test('should have correct timeouts', () {

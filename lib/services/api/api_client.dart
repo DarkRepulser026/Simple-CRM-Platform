@@ -1,22 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../utils/result.dart';
 import '../auth/auth_service.dart';
 import 'api_config.dart';
 import 'api_exceptions.dart';
+import '../service_locator.dart';
 
 /// HTTP API client with typed methods, error handling, and authentication
 class ApiClient {
   final http.Client _httpClient;
-  final AuthService _authService;
 
   ApiClient({
     http.Client? httpClient,
-    required AuthService authService,
-  })  : _httpClient = httpClient ?? http.Client(),
-        _authService = authService;
+  })  : _httpClient = httpClient ?? http.Client() {
+    // Debug: print base URL used by the client to help diagnose environment issues
+    debugPrint('ApiClient initialized with baseUrl=${ApiConfig.baseUrl}');
+  }
 
   /// Performs a GET request
   Future<Result<T, ApiError>> get<T>(
@@ -88,6 +90,7 @@ class ApiClient {
     int retryCount = 0,
   }) async {
     try {
+      debugPrint('ApiClient: Performing $method $url');
       final uri = Uri.parse(url);
       final requestHeaders = await _buildHeaders(headers);
       final requestBody = _encodeBody(body);
@@ -129,6 +132,7 @@ class ApiClient {
           retryCount: retryCount + 1,
         );
       }
+      debugPrint('ApiClient network error on $url: ${e.message}');
       return Result.error(ApiError.network('Network error: ${e.message}'));
     } on TimeoutException catch (e) {
       // Retry on timeouts
@@ -143,10 +147,12 @@ class ApiClient {
           retryCount: retryCount + 1,
         );
       }
+      debugPrint('ApiClient timeout on $url: ${e.message}');
       return Result.error(ApiError.timeout('Request timeout: ${e.message}'));
     } on FormatException catch (e) {
       return Result.error(ApiError.parsing('Invalid response format: ${e.message}'));
     } catch (e) {
+      debugPrint('ApiClient unexpected error on $url: $e');
       return Result.error(ApiError.unknown('Unexpected error: $e'));
     }
   }
@@ -162,13 +168,13 @@ class ApiClient {
     final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
 
     // Add authentication headers if user is logged in
-    if (_authService.isLoggedIn && _authService.jwtToken != null) {
-      headers[HttpHeaders.authorizationHeader] = 'Bearer ${_authService.jwtToken}';
+    if (locator<AuthService>().isLoggedIn && locator<AuthService>().jwtToken != null) {
+      headers[HttpHeaders.authorizationHeader] = 'Bearer ${locator<AuthService>().jwtToken}';
     }
 
-    // Add organization header if selected
-    if (_authService.hasSelectedOrganization && _authService.selectedOrganization != null) {
-      headers['X-Organization-ID'] = _authService.selectedOrganization!.id;
+    // Add organization header if organization is selected
+    if (locator<AuthService>().hasSelectedOrganization && locator<AuthService>().selectedOrganization != null) {
+      headers['X-Organization-ID'] = locator<AuthService>().selectedOrganization!.id;
     }
 
     // Add any additional headers
@@ -214,7 +220,7 @@ class ApiClient {
 
         case 401:
           // Unauthorized - clear auth and return error
-          _authService.logout();
+          locator<AuthService>().logout();
           return Result.error(ApiError.http(401, 'Unauthorized - please log in again'));
 
         case 403:
