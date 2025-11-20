@@ -55,6 +55,7 @@ model Organization {
   accounts    Account[]
   roles       UserRole[]
   activities  ActivityLog[]
+  tickets     Ticket[]
 
   @@map("organizations")
 }
@@ -165,6 +166,7 @@ model Task {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contact        Contact?     @relation(fields: [contactId], references: [id])
   lead           Lead?        @relation(fields: [leadId], references: [id])
+  account        Account?     @relation("TaskAccount", fields: [accountId], references: [id])
 
   @@map("tasks")
 }
@@ -182,7 +184,7 @@ model Account {
 
   // Relations
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tasks          Task[]
+  tasks          Task[]       @relation("TaskAccount")
 
   @@map("accounts")
 }
@@ -240,7 +242,7 @@ model Ticket {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  owner          User          @relation(fields: [ownerId], references: [id])
+  owner          User?          @relation(fields: [ownerId], references: [id])
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages       TicketMessage[]
 
@@ -345,4 +347,24 @@ enum TicketPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+// Attachments model - store attachments metadata
+model Attachment {
+  id             String   @id @default(cuid())
+  filename       String
+  mimeType       String?
+  url            String
+  size           Int?
+  uploadedBy     String?
+  entityType     String
+  entityId       String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  user           User?        @relation(fields: [uploadedBy], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
 }

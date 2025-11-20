@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/ticket.dart';
 import '../../navigation/app_router.dart';
+import '../../services/auth/auth_service.dart';
+import '../../services/tickets_service.dart';
+import '../../services/service_locator.dart';
 
 /// List screen for displaying and managing tickets with pagination
 class TicketsListScreen extends StatefulWidget {
@@ -12,29 +15,23 @@ class TicketsListScreen extends StatefulWidget {
 }
 
 class _TicketsListScreenState extends State<TicketsListScreen> {
+  late final TicketsService _ticketsService;
+  
+  @override
+  void initState() {
+    super.initState();
+    _ticketsService = locator<TicketsService>();
+  }
+  
+  
   Future<List<Ticket>> _fetchTicketsPage(int page, int limit) async {
-    // TODO: Implement actual API call using TicketsService
-    // For now, return mock data
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-
-    return List.generate(
-      limit,
-      (index) => Ticket(
-        id: 'ticket_${page}_${index}',
-        subject: 'Support Ticket ${(page - 1) * limit + index + 1}',
-        description: 'Customer is experiencing issues with the product. Need immediate assistance.',
-        status: TicketStatus.values[index % TicketStatus.values.length],
-        priority: TicketPriority.values[index % TicketPriority.values.length],
-        type: TicketType.values[index % TicketType.values.length],
-        dueDate: DateTime.now().add(Duration(days: index % 7)),
-        organizationId: 'org123',
-        createdAt: DateTime.now().subtract(Duration(days: index)),
-        updatedAt: DateTime.now().subtract(Duration(hours: index)),
-        customerId: 'customer${(page - 1) * limit + index + 1}',
-        assignedToId: index % 3 == 0 ? 'agent1' : null,
-        createdById: 'agent1',
-      ),
-    );
+    try {
+      final res = await _ticketsService.getTickets(page: page, limit: limit);
+      if (res.isSuccess) return res.value.tickets;
+      throw Exception(res.error.message);
+    } catch (e) {
+      throw Exception('Failed to load tickets: $e');
+    }
   }
 
   @override
@@ -43,11 +40,12 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
       appBar: AppBar(
         title: const Text('Tickets'),
         actions: [
-          IconButton(
-            onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketCreate),
-            icon: const Icon(Icons.add),
-            tooltip: 'Create Ticket',
-          ),
+          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
+            IconButton(
+              onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketCreate),
+              icon: const Icon(Icons.add),
+              tooltip: 'Create Ticket',
+            ),
           IconButton(
             onPressed: () {
               // TODO: Implement search
@@ -332,3 +330,5 @@ class TicketListItem extends StatelessWidget {
     }
   }
 }
+
+  

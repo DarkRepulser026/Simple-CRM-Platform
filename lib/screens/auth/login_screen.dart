@@ -1,10 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../widgets/web_google_sign_in_button.dart';
+
 import 'package:flutter/material.dart';
-import '../../widgets/loading_view.dart';
-import '../../widgets/error_view.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/auth/auth_service.dart';
-import '../../services/auth/auth_service_mock.dart';
-import '../../services/storage/secure_storage.dart';
-import '../../navigation/app_router.dart';
+import '../../services/service_locator.dart';
+import '../../services/api/api_config.dart';
 
 /// Login screen that handles Google Sign-In authentication
 class LoginScreen extends StatefulWidget {
@@ -15,38 +17,28 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final AuthService _authService; // TODO: provider when :( 
+  late final AuthService _authService;
   bool _isLoading = false;
   String? _errorMessage;
+  String _version = '';
+  String _buildNumber = '';
 
   @override
   void initState() {
     super.initState();
-    _initializeServices();
+    _authService = locator<AuthService>();
+    _loadPackageInfo();
   }
 
-  Future<void> _initializeServices() async {
-    // Initialize storage and auth service
-    final storage = await SecureStorage.create();
-    _authService = AuthServiceMock(storage);
-    await _initializeAuth();
+  Future<void> _loadPackageInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = packageInfo.version;
+      _buildNumber = packageInfo.buildNumber;
+    });
   }
 
-  Future<void> _initializeAuth() async {
-    try {
-      await _authService.initialize();
-      if (mounted && _authService.isLoggedIn) {
-        // User is already logged in, navigate to company selection
-        _navigateToCompanySelection();
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to initialize authentication: $e';
-      });
-    }
-  }
-
-  Future<void> _handleGoogleSignIn() async {
+  Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -54,108 +46,428 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final success = await _authService.signInWithGoogle();
-      if (mounted) {
-        if (success) {
-          _navigateToCompanySelection();
-        } else {
-          setState(() {
-            _errorMessage = 'Sign-in failed. Please try again.';
-            _isLoading = false;
-          });
-        }
+      if (success && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      } else if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to sign in with Google. Please try again.';
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Sign-in error: $e';
+          _errorMessage = 'An error occurred: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
           _isLoading = false;
         });
       }
     }
   }
 
-  void _navigateToCompanySelection() {
-    AppRouter.replaceWith(context, AppRouter.companySelection);
+  Future<void> _signInWithGoogleIdToken(String idToken) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final success = await _authService.signInWithGoogleIdToken(idToken);
+      if (success && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      } else if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to sign in with Google. Please try again.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An error occurred: ${e.toString()}';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildFeatureItem(IconData icon, String label, ThemeData theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1565C0).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFF1565C0).withOpacity(0.15),
+              width: 1,
+            ),
+          ),
+          child: Icon(icon, size: 24, color: const Color(0xFF1565C0)),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: const Color(0xFF424242),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // App Logo/Title
-              Column(
-                children: [
-                  Icon(
-                    Icons.business_center,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary,
+      backgroundColor: Colors.white,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Spacer(flex: 1),
+
+                // App Logo
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'CRM Project',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      'assets/icon/icon.png',
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Customer Services & Business Management',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+
+                const SizedBox(height: 40),
+
+                // Professional Title with tagline
+                Column(
+                  children: [
+                    Text(
+                      'CRM Project',
+                      style: theme.textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A1A),
+                        letterSpacing: -1.2,
+                        fontSize: 36,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
+
+                    const SizedBox(height: 4),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF1565C0).withOpacity(0.1),
+                            const Color(0xFF2196F3).withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF1565C0).withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        'PROFESSIONAL EDITION',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFF1565C0),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Error Message
+                if (_errorMessage != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: theme.colorScheme.onErrorContainer,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
 
-              const SizedBox(height: 64),
-
-              // Error message
-              if (_errorMessage != null) ...[
-                ErrorView(
-                  message: _errorMessage!,
-                  onRetry: _handleGoogleSignIn,
-                  retryText: 'Try Sign In Again',
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              // Sign In Button
-              if (!_isLoading) ...[
-                ElevatedButton.icon(
-                  onPressed: _handleGoogleSignIn,
-                  icon: const Icon(Icons.login),
-                  label: const Text('Sign in with Google'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                // Professional Feature Highlights
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  margin: const EdgeInsets.only(bottom: 32),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAFAFA),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFE0E0E0),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildFeatureItem(
+                        Icons.people_outline,
+                        'Contacts',
+                        theme,
+                      ),
+                      _buildFeatureItem(Icons.trending_up, 'Analytics', theme),
+                      _buildFeatureItem(Icons.task_alt, 'Pipeline', theme),
+                    ],
                   ),
                 ),
-              ] else ...[
-                const LoadingView(
-                  message: 'Signing you in...',
-                  size: 32,
+
+                // Google Sign In Button
+                if (kIsWeb)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Column(
+                      children: [
+                        WebGoogleSignInButton(
+                          clientId: ApiConfig.googleClientId,
+                          onSuccess: (idToken) async {
+                            await _signInWithGoogleIdToken(idToken);
+                          },
+                          onError: (error) {
+                            setState(() {
+                              _errorMessage = 'Sign-in error: $error';
+                              _isLoading = false;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Container(
+                      width: double.infinity,
+                      height: 60,
+                      constraints: const BoxConstraints(
+                        maxWidth: 400,
+                      ),
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF1A1A1A),
+                          elevation: 0,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: const Color(0xFF1565C0).withOpacity(0.2),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        icon: _isLoading
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF1565C0),
+                                  ),
+                                ),
+                              )
+                            : const FaIcon(
+                                FontAwesomeIcons.google,
+                                size: 20,
+                                color: Color(0xFF4285F4),
+                              ),
+                        label: Text(
+                          _isLoading
+                              ? 'Signing you in...'
+                              : 'Sign in with Google',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _isLoading
+                                ? const Color(0xFF666666)
+                                : const Color(0xFF1A1A1A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 32),
+
+                // Professional Footer
+                Column(
+                  children: [
+                    // Security Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF50).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF4CAF50).withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.security,
+                            size: 16,
+                            color: const Color(0xFF4CAF50),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Enterprise-grade security',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF4CAF50),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Terms and Privacy
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF666666),
+                            height: 1.5,
+                            fontSize: 12,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'By signing in, you agree to our ',
+                            ),
+                            TextSpan(
+                              text: 'Terms of Service',
+                              style: TextStyle(
+                                color: const Color(0xFF1565C0),
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                                decorationColor: const Color(
+                                  0xFF1565C0,
+                                ).withOpacity(0.5),
+                              ),
+                            ),
+                            const TextSpan(text: ' and '),
+                            TextSpan(
+                              text: 'Privacy Policy',
+                              style: TextStyle(
+                                color: const Color(0xFF1565C0),
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.underline,
+                                decorationColor: const Color(
+                                  0xFF1565C0,
+                                ).withOpacity(0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+
+                const SizedBox(height: 24),
+
+                // Version information
+                if (_version.isNotEmpty && _buildNumber.isNotEmpty)
+                  Text(
+                    'Version $_version ($_buildNumber)',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF999999),
+                      fontSize: 11,
+                    ),
+                  ),
+
+                const Spacer(flex: 1),
               ],
-
-              const SizedBox(height: 32),
-
-              // Footer text
-              Text(
-                'Secure authentication powered by Google',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+            ),
           ),
         ),
       ),

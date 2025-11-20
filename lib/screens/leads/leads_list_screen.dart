@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/lead.dart';
 import '../../navigation/app_router.dart';
+import '../../services/leads_service.dart';
+import '../../services/service_locator.dart';
 
 /// List screen for displaying and managing leads with pagination
 class LeadsListScreen extends StatefulWidget {
@@ -12,28 +14,15 @@ class LeadsListScreen extends StatefulWidget {
 }
 
 class _LeadsListScreenState extends State<LeadsListScreen> {
+  late final LeadsService _leadsService;
   Future<List<Lead>> _fetchLeadsPage(int page, int limit) async {
-    // TODO: Implement actual API call using LeadsService
-    // For now, return mock data
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-
-    return List.generate(
-      limit,
-      (index) => Lead(
-        id: 'lead_${page}_${index}',
-        firstName: 'Lead',
-        lastName: '${(page - 1) * limit + index + 1}',
-        organizationId: 'org123',
-        createdAt: DateTime.now().subtract(Duration(days: index)),
-        updatedAt: DateTime.now().subtract(Duration(hours: index)),
-        email: 'lead${(page - 1) * limit + index + 1}@example.com',
-        phone: '+1-555-02${((page - 1) * limit + index + 1).toString().padLeft(4, '0')}',
-        company: 'Company ${(page - 1) * limit + index + 1}',
-        status: LeadStatus.values[index % LeadStatus.values.length],
-        leadSource: LeadSource.values[index % LeadSource.values.length],
-        isConverted: false,
-      ),
-    );
+    try {
+      final res = await _leadsService.getLeads(page: page, limit: limit);
+      if (res.isSuccess) return res.value.leads;
+      throw Exception(res.error.message);
+    } catch (e) {
+      throw Exception('Failed to load leads: $e');
+    }
   }
 
   @override
@@ -79,6 +68,12 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
       AppRouter.leadDetail,
       arguments: LeadDetailArgs(leadId: leadId),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _leadsService = locator<LeadsService>();
   }
 }
 

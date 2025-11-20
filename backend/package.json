@@ -4,19 +4,37 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed-setup.js",
+    "server:test": "node scripts/test-start.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@prisma/client": "^6.18.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "express-session": "^1.17.3",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "multer": "2.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
     "prisma": "^6.18.0"
+  }
+,"prisma": {
+    "seed": "node prisma/seed.js"
   }
 }

@@ -35,12 +35,13 @@ void main() {
     });
 
     test('should convert Account to JSON', () {
-      const account = Account(
+      final account = Account(
         id: '123',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-1',
       );
 
       final json = account.toJson();
@@ -53,12 +54,13 @@ void main() {
     });
 
     test('should create copy with modified fields', () {
-      const account = Account(
+      final account = Account(
         id: '123',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-1',
       );
 
       final updatedAccount = account.copyWith(
@@ -75,28 +77,31 @@ void main() {
     });
 
     test('should implement equality correctly', () {
-      const account1 = Account(
+      final account1 = Account(
         id: '123',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-1',
       );
 
-      const account2 = Account(
+      final account2 = Account(
         id: '123',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-1',
       );
 
-      const account3 = Account(
+      final account3 = Account(
         id: '456',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-2',
       );
 
       expect(account1 == account2, true);
@@ -106,12 +111,13 @@ void main() {
     });
 
     test('should handle partial copyWith correctly', () {
-      const account = Account(
+      final account = Account(
         id: '123',
         name: 'ABC Corporation',
         type: 'Customer',
         website: 'https://abc.com',
         phone: '+1234567890',
+        organizationId: 'org-1',
       );
 
       final updatedAccount = account.copyWith(
