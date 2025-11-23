@@ -2,4 +2,11 @@
   "dependencies": {
     "node-fetch": "^3.3.2"
   }
+  ,
+  "scripts": {
+    "grant-admin": "npm --prefix backend run grant-admin",
+    "seed-demo": "npm --prefix backend run seed-demo",
+    "backend-grant-admin": "npm --prefix backend run grant-admin",
+    "backend-seed-demo": "npm --prefix backend run seed-demo"
+  }
 }

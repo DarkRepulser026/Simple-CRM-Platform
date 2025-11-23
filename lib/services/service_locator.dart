@@ -15,6 +15,7 @@ import 'roles_service.dart';
 import 'activity_log_service.dart';
 import 'interaction_service.dart';
 import 'attachments_service.dart';
+import 'invitations_service.dart';
 
 final GetIt locator = GetIt.instance;
 
@@ -95,5 +96,11 @@ Future<void> setupLocator() async {
   // Attachments
   locator.registerLazySingleton<AttachmentsService>(() => AttachmentsService(
     locator<AuthService>(),
+  ));
+
+  // Invitations
+  locator.registerLazySingleton<InvitationsService>(() => InvitationsService(
+    apiClient: locator<ApiClient>(),
+    authService: locator<AuthService>(),
   ));
 }
