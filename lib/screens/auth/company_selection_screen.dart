@@ -3,6 +3,8 @@ import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/service_locator.dart';
+import '../../services/organizations_service.dart';
+import '../../models/organization.dart';
 import '../../navigation/app_router.dart';
 
 /// Company/Organization selection screen
@@ -16,9 +18,10 @@ class CompanySelectionScreen extends StatefulWidget {
 
 class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
   late final AuthService _authService;
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
   final TextEditingController _companyController = TextEditingController();
+  List<Organization> _organizations = [];
 
   @override
   void initState() {
@@ -28,6 +31,23 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
 
   Future<void> _initializeServices() async {
     _authService = locator<AuthService>();
+    try {
+      final orgService = locator<OrganizationsService>();
+      final res = await orgService.getOrganizations(page: 1, limit: 50);
+      if (res.isSuccess) {
+        _organizations = res.value.organizations;
+        // Auto-select if only 1 organization
+        if (_organizations.length == 1) {
+          await _selectCompany(_organizations.first.id);
+        }
+      } else if (res.isError) {
+        _errorMessage = res.error.message;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      setState(() { _isLoading = false; });
+    }
   }
 
   Future<void> _selectCompany(String companyId) async {
@@ -60,7 +80,21 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
       return;
     }
 
-    await _selectCompany(companyName);
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final orgService = locator<OrganizationsService>();
+      final result = await orgService.createOrganization(Organization(id: '', name: companyName));
+      if (result.isSuccess) {
+        final org = result.value;
+        await _selectCompany(org.id);
+      } else {
+        setState(() { _errorMessage = result.error.message; });
+      }
+    } catch (e) {
+      setState(() { _errorMessage = e.toString(); });
+    } finally {
+      setState(() { _isLoading = false; });
+    }
   }
 
   void _navigateToDashboard() {
@@ -114,7 +148,7 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
                 const SizedBox(height: 24),
               ],
 
-              // Quick company selection buttons
+              // Quick company selection buttons (from your organizations)
               Text(
                 'Quick Select:',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -123,25 +157,17 @@ class _CompanySelectionScreenState extends State<CompanySelectionScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Demo companies
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _CompanyChip(
-                    name: 'Ep Pe Te',
-                    onTap: () => _selectCompany('acme-corp'),
-                  ),
-                  _CompanyChip(
-                    name: '7 chars',
-                    onTap: () => _selectCompany('techstart-inc'),
-                  ),
-                  _CompanyChip(
-                    name: 'temp',
-                    onTap: () => _selectCompany('global-solutions'),
-                  ),
-                ],
-              ),
+              // Organizations list
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_organizations.isEmpty)
+                const Text('No organizations found')
+              else
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _organizations.map((org) => _CompanyChip(name: org.name, onTap: () => _selectCompany(org.id))).toList(),
+                ),
 
               const SizedBox(height: 48),
 

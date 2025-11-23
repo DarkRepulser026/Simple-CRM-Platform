@@ -1,13 +1,9 @@
-import 'dart:typed_data';
-import 'dart:io';
-import 'package:file_picker/file_picker.dart';
+// Native picker is intentionally disabled for web-only workflows. No imports required.
 import 'picker_stub.dart';
 
 Future<PickedFile?> pickFile() async {
-  final res = await FilePicker.platform.pickFiles(withData: true);
-  if (res == null || res.files.isEmpty) return null;
-  final f = res.files.first;
-  final bytes = f.bytes ?? (f.path != null ? await File(f.path!).readAsBytes() : Uint8List(0));
-  final mime = f.extension != null ? 'application/${f.extension}' : null;
-  return PickedFile(name: f.name, bytes: bytes, mimeType: mime);
+  // Native picker not implemented in this project (web-only workflow).
+  // This implementation intentionally returns null instead of requiring the file_picker plugin.
+  // If native support is needed later, implement using `file_picker` or a suitable plugin.
+  return null;
 }

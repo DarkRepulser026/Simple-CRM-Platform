@@ -93,6 +93,8 @@ Useful npm scripts are available in `backend/package.json` for migrations and ge
 - `npm run prisma:generate` — generates the Prisma Client
 - `npm run prisma:studio` — launches Prisma Studio
 - `npm run prisma:seed` — runs a seed script (`prisma/seed.js`) to populate initial data
+ - `npm run grant-admin -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Grants full admin permissions for an org and assigns the user as admin (dev script)
+ - `npm run seed-demo -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Seeds sample accounts, contacts, leads, tasks, and tickets for the organization (dev script)
 
 ## Using from other runtimes (e.g., Flutter `lib/`)
 
@@ -150,6 +152,14 @@ Prisma ORM works on the backend (Node.js) and isn't used directly in Flutter. Us
 - `GET /attachments?entityType=<type>&entityId=<id>` - List attachments for an entity - Requires `VIEW_*` permission for that entity.
 - `GET /attachments/:id` - Get attachment metadata
 - `GET /attachments/:id/download` - Download attachment file
+
+### Invitation Flow
+- `POST /organizations/:id/invite` - Create a single-use invitation for an email and role (requires `MANAGE_USERS` permission). Body: `{ "email": "user@example.com", "role": "ADMIN" }`. Server saves hashed token and sends invite email (or logs invite link).
+- `POST /invite/accept` - Accept an invite using token and optional name. Body: `{ "token": "<token>", "name": "Full Name" }`. Server verifies token, creates user if needed, associates them with the organization, grants the invited role, and returns a JWT and user info on success.
+ - `GET /organizations/:id/invitations` - List pending invitations (requires `MANAGE_USERS` permission). Returns invites that are not accepted or revoked.
+ - `POST /admin/invitations/:id/revoke` - Revoke an outstanding invitation (requires `MANAGE_USERS` permission). Marks the invite as revoked and prevents reuse. Logs activity for audit.
+ - `POST /admin/view-as/:userId` - Admin impersonation (view-as). Returns a short-lived JWT token for the target user. Requires `MANAGE_USERS` permission and logs activity.
+ - `POST /invite/accept` - Accept an invite using token and optional name. Body: `{ "token": "<token>", "name": "Full Name" }`. Server verifies token, creates user if needed, associates them with the organization, grants the invited role, and returns a JWT and user info on success. If the invited role is `ADMIN`, the server also sets an `httpOnly` cookie named `admin_session` containing the JWT to support admin session flows.
 
 ### Dashboard
 - `GET /dashboard` - Get dashboard statistics

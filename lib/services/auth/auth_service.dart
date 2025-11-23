@@ -13,11 +13,20 @@ abstract class AuthService {
   /// Sign in with Google using an ID token (for web)
   Future<bool> signInWithGoogleIdToken(String idToken);
 
+  /// Accept an invite token and sign in as the invited user (returns true on success)
+  Future<bool> signInWithInviteToken(String token, {String? name});
+
   /// Select an organization for the current user
   Future<void> selectOrganization(String organizationId);
 
   /// Logout and clear all persisted state
   Future<void> logout();
+
+  /// Impersonate another user temporarily by providing a token
+  Future<bool> impersonateWithToken(String token);
+
+  /// Stop impersonation and revert to original admin token
+  Future<bool> stopImpersonation();
 
   /// Whether the user is currently logged in
   bool get isLoggedIn;
@@ -42,4 +51,7 @@ abstract class AuthService {
 
   /// Get the selected organization ID
   String? get selectedOrganizationId => selectedOrganization?.id;
+
+  /// Whether the current auth session is an impersonation
+  bool get isImpersonating;
 }
