@@ -56,35 +56,49 @@ class DashboardMetrics {
 
   /// Factory constructor to create DashboardMetrics from JSON
   factory DashboardMetrics.fromJson(Map<String, dynamic> json) {
-    final metrics = json['metrics'] ?? json;
+    final counts = json['counts'] ?? {};
+    final ticketStats = json['ticketStats'] as List<dynamic>? ?? [];
+    final Map<String, int> ticketsByStatus = {};
+    for (final s in ticketStats) {
+      try {
+        final status = s['status'] as String? ?? 'Unknown';
+        final count = (s['_count'] != null && s['_count']['status'] != null) ? (s['_count']['status'] as int) : (s['count'] as int? ?? 0);
+        ticketsByStatus[status] = count;
+      } catch (_) {
+        // ignore parsing errors for stats
+      }
+    }
+
+    final totalTickets = (counts['tickets'] is int)
+      ? counts['tickets'] as int
+      : ticketsByStatus.values.fold<int>(0, (a, b) => a + b);
+    final openTickets = ticketsByStatus['Open'] ?? ticketsByStatus['open'] ?? 0;
+    final pendingTickets = ticketsByStatus['Pending'] ?? ticketsByStatus['pending'] ?? 0;
+    final resolvedTickets = ticketsByStatus['Resolved'] ?? ticketsByStatus['resolved'] ?? 0;
+    final overdueTickets = ticketsByStatus['Overdue'] ?? ticketsByStatus['overdue'] ?? 0;
+
     return DashboardMetrics(
-      totalLeads: metrics['totalLeads'] ?? 0,
-      totalOpportunities: metrics['totalOpportunities'] ?? 0,
-      totalAccounts: metrics['totalAccounts'] ?? 0,
-      totalContacts: metrics['totalContacts'] ?? 0,
-      pendingTasks: metrics['pendingTasks'] ?? 0,
-      opportunityRevenue: (metrics['opportunityRevenue'] ?? 0).toDouble(),
-      totalTickets: metrics['totalTickets'] ?? 0,
-      openTickets: metrics['openTickets'] ?? 0,
-      pendingTickets: metrics['pendingTickets'] ?? 0,
-      resolvedTickets: metrics['resolvedTickets'] ?? 0,
-      overdueTickets: metrics['overdueTickets'] ?? 0,
-      ticketsByStatus: metrics['ticketsByStatus'] != null
-          ? Map<String, int>.from(metrics['ticketsByStatus'])
-          : {},
-      ticketsByAgent: metrics['ticketsByAgent'] != null
-          ? Map<String, int>.from(metrics['ticketsByAgent'])
-          : {},
-      ticketsByPriority: metrics['ticketsByPriority'] != null
-          ? Map<String, int>.from(metrics['ticketsByPriority'])
-          : {},
-      averageCsat: (metrics['averageCsat'] ?? 0).toDouble(),
-      averageNps: (metrics['averageNps'] ?? 0).toDouble(),
-      totalSatisfactionResponses: metrics['totalSatisfactionResponses'] ?? 0,
-      averageFirstResponseTime: (metrics['averageFirstResponseTime'] ?? 0).toDouble(),
-      averageResolutionTime: (metrics['averageResolutionTime'] ?? 0).toDouble(),
-      averageResponseTime: (metrics['averageResponseTime'] ?? 0).toDouble(),
-      slaComplianceRate: (metrics['slaComplianceRate'] ?? 0).toDouble(),
+      totalLeads: (counts['leads'] as int?) ?? 0,
+      totalOpportunities: 0,
+      totalAccounts: (counts['accounts'] as int?) ?? 0,
+      totalContacts: (counts['contacts'] as int?) ?? 0,
+      pendingTasks: (counts['tasks'] as int?) ?? 0,
+      opportunityRevenue: 0.0,
+      totalTickets: totalTickets,
+      openTickets: openTickets,
+      pendingTickets: pendingTickets,
+      resolvedTickets: resolvedTickets,
+      overdueTickets: overdueTickets,
+      ticketsByStatus: ticketsByStatus,
+      ticketsByAgent: {},
+      ticketsByPriority: {},
+      averageCsat: 0.0,
+      averageNps: 0.0,
+      totalSatisfactionResponses: 0,
+      averageFirstResponseTime: 0.0,
+      averageResolutionTime: 0.0,
+      averageResponseTime: 0.0,
+      slaComplianceRate: 0.0,
     );
   }
 

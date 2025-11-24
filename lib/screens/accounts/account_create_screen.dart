@@ -3,6 +3,7 @@ import '../../models/account.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/accounts_service.dart';
+import '../../services/api/api_exceptions.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
@@ -16,6 +17,7 @@ class AccountCreateScreen extends StatefulWidget {
 class _AccountCreateScreenState extends State<AccountCreateScreen> {
   late final AccountsService _accountsService;
   late final AuthService _authService;
+  bool _apiAvailable = true;
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _typeCtrl = TextEditingController();
@@ -27,6 +29,15 @@ class _AccountCreateScreenState extends State<AccountCreateScreen> {
     super.initState();
     _accountsService = locator<AccountsService>();
     _authService = locator<AuthService>();
+    _checkApiAvailability();
+  }
+
+  Future<void> _checkApiAvailability() async {
+    if (!_authService.isLoggedIn || !_authService.hasSelectedOrganization) return;
+    final res = await _accountsService.getAccounts(page: 1, limit: 1);
+    if (res.isError && res.error is HttpError && (res.error as HttpError).statusCode == 404) {
+      setState(() => _apiAvailable = false);
+    }
   }
 
   Future<void> _createAccount() async {
@@ -66,6 +77,16 @@ class _AccountCreateScreenState extends State<AccountCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!_apiAvailable)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('Accounts API is not available on the server. Creation is disabled.'),
+                ),
               if (_error != null) ErrorView(message: _error!, onRetry: null),
               TextFormField(
                 controller: _nameCtrl,
@@ -79,7 +100,7 @@ class _AccountCreateScreenState extends State<AccountCreateScreen> {
               ),
               const SizedBox(height: 20),
               if (_isLoading) const LoadingView(message: 'Creating account...')
-              else ElevatedButton(onPressed: _createAccount, child: const Text('Create'))
+              else ElevatedButton(onPressed: _apiAvailable ? _createAccount : null, child: const Text('Create'))
             ],
           ),
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/dashboard_metrics.dart';
 import '../../services/auth/auth_service.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/service_locator.dart';
 import '../../services/dashboard_service.dart';
 import '../../widgets/error_view.dart';
@@ -50,6 +51,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
         return;
       }
+
+      // If the user is not authenticated, navigate to login
+      if (!_authService.isLoggedIn) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to continue')));
+          AppRouter.replaceWith(context, AppRouter.login);
+        }
+        return;
+      }
+
+      // If the issue is that an organization has not been selected, navigate to company selection
+      if (!_authService.hasSelectedOrganization) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an organization to view dashboard')));
+          AppRouter.navigateTo(context, AppRouter.companySelection);
+        }
+        return;
+      }
+
+      // Otherwise throw to surface the error message
       throw Exception(res.error.message);
     } catch (e) {
       setState(() {
@@ -65,6 +86,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isSmallScreen = screenWidth < 800;
 
     return Scaffold(
+      floatingActionButton: kDebugMode
+          ? FloatingActionButton(
+              mini: true,
+              tooltip: 'Debug info',
+              child: const Icon(Icons.info_outline),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Debug Info'),
+                    content: Text('Logged in: ${_authService.isLoggedIn}\nImpersonating: ${_authService.isImpersonating}\nSelected organization: ${_authService.selectedOrganizationId ?? 'none'}\nJWT present: ${_authService.jwtToken != null}'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+                    ],
+                  ),
+                );
+              },
+            )
+          : null,
       body: Row(
         children: [
           _buildSidebar(showLogout: !isSmallScreen, showImpersonation: !isSmallScreen),
@@ -132,6 +172,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
+                            if (kDebugMode) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Debug: Auth=${_authService.isLoggedIn ? 'yes' : 'no'}  Org=${_authService.selectedOrganizationId ?? 'none'}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                             Text(
                               'Here\'s your business overview',
                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(

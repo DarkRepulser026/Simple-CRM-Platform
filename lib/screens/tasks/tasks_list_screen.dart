@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/task.dart';
 import '../../navigation/app_router.dart';
+import '../../services/auth/auth_service.dart';
+import '../../widgets/error_view.dart';
 import '../../services/tasks_service.dart';
 import '../../services/service_locator.dart';
 
@@ -37,6 +39,9 @@ class _TasksListScreenState extends State<TasksListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (locator<AuthService>().isLoggedIn && !locator<AuthService>().hasSelectedOrganization) {
+      return Scaffold(body: ErrorView(message: 'No organization selected. Please select a company to continue.', onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection)));
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tasks'),

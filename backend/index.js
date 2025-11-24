@@ -132,6 +132,16 @@ app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path} Origin:${req.headers.origin || 'none'}`);
   next();
 });
+
+// Dev-only headers debug middleware — logs presence of Authorization and organization headers (not values)
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') {
+    const authPresent = req.headers['authorization'] ? true : false;
+    const xOrg = req.headers['x-organization-id'] ? req.headers['x-organization-id'] : null;
+    console.log(`Header check: Authorization present=${authPresent} X-Organization-ID=${xOrg}`);
+  }
+  next();
+});
 app.use(express.json());
 app.use(cookieParser());
 app.use(session({
@@ -169,6 +179,16 @@ app.get('/health', async (req, res) => {
   } catch (e) {
     return res.status(500).json({ status: 'error', message: e.message });
   }
+});
+
+// Dev helper route to inspect received headers for debugging (not enabled in production)
+app.get('/debug/headers', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ message: 'Disabled in production' });
+  }
+  const auth = req.headers['authorization'];
+  const xorg = req.headers['x-organization-id'];
+  return res.json({ authorization: auth ? (typeof auth === 'string' ? `${auth.substring(0, 12)}...` : true) : null, xOrganizationId: xorg || null });
 });
 
 // Authentication middleware
