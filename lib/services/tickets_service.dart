@@ -110,11 +110,11 @@ class TicketsService {
 
     final uri = Uri.parse(ApiConfig.tickets).replace(queryParameters: queryParams);
 
-    return _apiClient.get<TicketsResponse>(
-      uri.toString(),
-      headers: await _getAuthHeaders(),
-      fromJson: TicketsResponse.fromJson,
-    );
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final jsonList = res.value as List<dynamic>;
+    final tickets = jsonList.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList();
+    return Result.success(TicketsResponse(tickets: tickets));
   }
 
   /// Get a single ticket by ID

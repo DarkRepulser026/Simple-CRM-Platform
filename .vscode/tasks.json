@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev Backend",
+      "type": "shell",
+      "command": "npm",
+      "args": ["--prefix", "backend", "run", "dev"],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev Frontend",
+      "type": "shell",
+      "command": "bash",
+      "args": ["-lc", "flutter pub get && flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID"],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "showReuseMessage": false
+      },
+      "problemMatcher": [],
+      "windows": {
+        "command": "powershell",
+        "args": ["-Command", "flutter pub get ; flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID"]
+      }
+    },
+    {
+      "label": "Dev: Start both",
+      "dependsOn": ["Dev Backend", "Dev Frontend"],
+      "dependsOrder": "parallel"
+    }
+  ]
+}

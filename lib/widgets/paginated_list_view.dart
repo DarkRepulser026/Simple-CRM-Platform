@@ -127,7 +127,7 @@ class _PaginatedListViewState<T> extends State<PaginatedListView<T>> {
 
     if (_error != null && _items.isEmpty) {
       return ErrorView(
-        message: widget.errorMessage,
+        message: _error ?? widget.errorMessage,
         onRetry: _loadInitialPage,
       );
     }

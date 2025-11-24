@@ -98,12 +98,18 @@ class ApiClient {
       final request = http.Request(method, uri)
         ..headers.addAll(requestHeaders)
         ..body = requestBody ?? '';
+      if (kDebugMode) {
+        debugPrint('Request headers for $method $url: $requestHeaders');
+      }
 
       final streamedResponse = await _httpClient
           .send(request)
           .timeout(ApiConfig.receiveTimeout);
 
       final response = await http.Response.fromStream(streamedResponse);
+      if (kDebugMode) {
+        debugPrint('Response for $method $url: ${response.statusCode} ${response.body}');
+      }
 
       // Check if we should retry on certain errors
       if (_shouldRetry(response.statusCode) && retryCount < ApiConfig.maxRetries) {
@@ -151,6 +157,21 @@ class ApiClient {
       return Result.error(ApiError.timeout('Request timeout: ${e.message}'));
     } on FormatException catch (e) {
       return Result.error(ApiError.parsing('Invalid response format: ${e.message}'));
+    } on http.ClientException catch (e) {
+      // ClientException occurs on web when fetch fails (CORS, network);
+      if (retryCount < ApiConfig.maxRetries) {
+        await Future.delayed(ApiConfig.retryDelay * (retryCount + 1));
+        return _performRequest(
+          method,
+          url,
+          headers: headers,
+          body: body,
+          fromJson: fromJson,
+          retryCount: retryCount + 1,
+        );
+      }
+      debugPrint('ApiClient client error on $url: ${e.message}');
+      return Result.error(ApiError.network('Client error: ${e.message}'));
     } catch (e) {
       debugPrint('ApiClient unexpected error on $url: $e');
       return Result.error(ApiError.unknown('Unexpected error: $e'));

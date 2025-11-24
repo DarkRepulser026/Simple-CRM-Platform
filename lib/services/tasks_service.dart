@@ -86,11 +86,11 @@ class TasksService {
 
     final uri = Uri.parse(ApiConfig.tasks).replace(queryParameters: queryParams);
 
-    return _apiClient.get<TasksResponse>(
-      uri.toString(),
-      headers: await _getAuthHeaders(),
-      fromJson: TasksResponse.fromJson,
-    );
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final jsonList = res.value as List<dynamic>;
+    final tasks = jsonList.map((t) => Task.fromJson(t as Map<String, dynamic>)).toList();
+    return Result.success(TasksResponse(tasks: tasks));
   }
 
   /// Get a single task by ID

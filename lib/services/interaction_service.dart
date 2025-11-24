@@ -45,7 +45,7 @@ class InteractionService {
     if (leadId != null) queryParams['leadId'] = leadId;
     if (ticketId != null) queryParams['ticketId'] = ticketId;
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
-    final uri = Uri.parse(ApiConfig.baseUrl + '/interactions').replace(queryParameters: queryParams);
+    final uri = Uri.parse(ApiConfig.interactions).replace(queryParameters: queryParams);
     return _apiClient.get<InteractionsResponse>(uri.toString(), headers: await _getAuthHeaders(), fromJson: InteractionsResponse.fromJson);
   }
 
@@ -53,7 +53,7 @@ class InteractionService {
     if (!_authService.isAuthenticated) return Result.error(ApiError.unauthorized());
     final data = interaction.toJson();
     data.remove('id');
-    return _apiClient.post<Interaction>(ApiConfig.baseUrl + '/interactions', headers: await _getAuthHeaders(), body: data, fromJson: Interaction.fromJson);
+    return _apiClient.post<Interaction>(ApiConfig.interactions, headers: await _getAuthHeaders(), body: data, fromJson: Interaction.fromJson);
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {
