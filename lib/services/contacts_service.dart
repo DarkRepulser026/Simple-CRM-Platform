@@ -62,11 +62,11 @@ class ContactsService {
 
     final uri = Uri.parse(ApiConfig.contacts).replace(queryParameters: queryParams);
 
-    return _apiClient.get<ContactsResponse>(
-      uri.toString(),
-      headers: await _getAuthHeaders(),
-      fromJson: ContactsResponse.fromJson,
-    );
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final jsonList = res.value as List<dynamic>;
+    final contacts = jsonList.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList();
+    return Result.success(ContactsResponse(contacts: contacts));
   }
 
   /// Get a single contact by ID
@@ -166,11 +166,11 @@ class ContactsService {
 
     final uri = Uri.parse('${ApiConfig.contacts}/search').replace(queryParameters: queryParams);
 
-    return _apiClient.get<ContactsResponse>(
-      uri.toString(),
-      headers: await _getAuthHeaders(),
-      fromJson: ContactsResponse.fromJson,
-    );
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final jsonList = res.value as List<dynamic>;
+    final contacts = jsonList.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList();
+    return Result.success(ContactsResponse(contacts: contacts));
   }
 
   /// Get authentication headers

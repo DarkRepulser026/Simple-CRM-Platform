@@ -67,6 +67,24 @@ class UsersService {
     return result.isSuccess ? Result.success(null) : Result.error(result.error);
   }
 
+  Future<Result<void, ApiError>> inviteUser({required String orgId, required String email, required String role}) async {
+    if (!_authService.isAuthenticated) return Result.error(ApiError.unauthorized());
+    final url = ApiConfig.organizationInvite(orgId);
+    final res = await _apiClient.post<void>(url, headers: await _getAuthHeaders(), body: {'email': email, 'role': role}, fromJson: (_) => null);
+    return res.isSuccess ? Result.success(null) : Result.error(res.error);
+  }
+
+  Future<Result<void, ApiError>> viewAs(String userId) async {
+    if (!_authService.isAuthenticated) return Result.error(ApiError.unauthorized());
+    final url = ApiConfig.adminViewAs(userId);
+    final res = await _apiClient.post<Map<String, dynamic>>(url, headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final token = res.value['token'] as String?;
+    if (token == null) return Result.error(ApiError.unknown('No token returned'));
+    final ok = await _authService.impersonateWithToken(token);
+    return ok ? Result.success(null) : Result.error(ApiError.unknown('Failed to start impersonation'));
+  }
+
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = _authService.jwtToken;
     final orgId = _authService.selectedOrganizationId;

@@ -24,7 +24,7 @@ class AttachmentsService {
     String? mimeType,
   }) async {
     try {
-      final uri = Uri.parse(ApiConfig.baseUrl + '/attachments');
+      final uri = Uri.parse(ApiConfig.attachments);
       final request = http.MultipartRequest('POST', uri);
       final token = _authService.jwtToken;
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
@@ -63,7 +63,7 @@ class AttachmentsService {
     required String entityId,
   }) async {
     try {
-      final uri = Uri.parse(ApiConfig.baseUrl + '/attachments').replace(queryParameters: {
+      final uri = Uri.parse(ApiConfig.attachments).replace(queryParameters: {
         'entityType': entityType,
         'entityId': entityId,
       });

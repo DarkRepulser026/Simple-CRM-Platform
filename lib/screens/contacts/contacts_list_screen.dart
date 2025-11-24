@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
-import '../../models/contact.dart';
+import '../../services/auth/auth_service.dart';
 import '../../navigation/app_router.dart';
+import '../../models/contact.dart';
+import '../../widgets/error_view.dart';
 import '../../services/contacts_service.dart';
 import '../../services/service_locator.dart';
 
@@ -30,6 +32,9 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (locator<AuthService>().isLoggedIn && !locator<AuthService>().hasSelectedOrganization) {
+      return Scaffold(body: ErrorView(message: 'No organization selected. Please select a company to continue.', onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection)));
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Contacts'),

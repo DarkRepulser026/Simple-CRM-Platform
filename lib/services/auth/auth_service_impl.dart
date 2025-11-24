@@ -9,6 +9,8 @@ import '../api/api_client.dart';
 import '../api/api_config.dart';
 import '../storage/secure_storage.dart';
 import 'auth_service.dart';
+import '../service_locator.dart';
+import '../organizations_service.dart';
 
 /// Real authentication service implementation using Google Sign-In
 class AuthServiceImpl implements AuthService {
@@ -17,6 +19,7 @@ class AuthServiceImpl implements AuthService {
 
   User? _currentUser;
   String? _jwtToken;
+  bool _isImpersonating = false;
   Organization? _selectedOrganization;
 
   // Use the plugin instance
@@ -40,6 +43,19 @@ class AuthServiceImpl implements AuthService {
 
       if (orgJson != null) {
         _selectedOrganization = Organization.fromJson(jsonDecode(orgJson));
+      }
+
+      // If logged in with only one organization, select it automatically
+      if (_jwtToken != null && _selectedOrganization == null) {
+        try {
+          final orgService = locator<OrganizationsService>();
+          final res = await orgService.getOrganizations(page: 1, limit: 10);
+          if (res.isSuccess && res.value.organizations.length == 1) {
+            await selectOrganization(res.value.organizations.first.id);
+          }
+        } catch (_) {
+          // ignore - optional behavior
+        }
       }
 
       debugPrint('AuthService initialized: loggedIn=$isLoggedIn, hasOrg=$hasSelectedOrganization');
@@ -133,7 +149,61 @@ class AuthServiceImpl implements AuthService {
   }
 
   @override
+  Future<bool> impersonateWithToken(String token) async {
+    try {
+      // Save current token as original if not already impersonating
+      final current = _jwtToken;
+      if (current != null) await _storage.saveOriginalToken(current);
+      // Set new token
+      _jwtToken = token;
+      // Ask backend for user
+      final me = await _apiClient.get<Map<String, dynamic>>(ApiConfig.authMe);
+      if (me.isError) {
+        // revert to original token if failed
+        final orig = await _storage.readOriginalToken();
+        if (orig != null) {
+          _jwtToken = orig;
+        }
+        return false;
+      }
+      _currentUser = User.fromJson(me.value);
+      await _storage.saveToken(_jwtToken!);
+      await _storage.saveUser(jsonEncode(_currentUser!.toJson()));
+      _isImpersonating = true;
+      debugPrint('Impersonation started: ${_currentUser!.email}');
+      return true;
+    } catch (e) {
+      debugPrint('Impersonation error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopImpersonation() async {
+    try {
+      final orig = await _storage.readOriginalToken();
+      if (orig == null) return false;
+      _jwtToken = orig;
+      final me = await _apiClient.get<Map<String, dynamic>>(ApiConfig.authMe);
+      if (me.isError) return false;
+      _currentUser = User.fromJson(me.value);
+      await _storage.saveToken(_jwtToken!);
+      await _storage.saveUser(jsonEncode(_currentUser!.toJson()));
+      await _storage.clearOriginalToken();
+      _isImpersonating = false;
+      debugPrint('Impersonation stopped; restored: ${_currentUser!.email}');
+      return true;
+    } catch (e) {
+      debugPrint('Stop impersonation error: $e');
+      return false;
+    }
+  }
+
+  @override
   bool get isLoggedIn => _currentUser != null && _jwtToken != null;
+
+  @override
+  bool get isImpersonating => _isImpersonating;
 
   @override
   bool get hasSelectedOrganization => _selectedOrganization != null;
@@ -158,10 +228,17 @@ class AuthServiceImpl implements AuthService {
 
   @override
   Future<void> selectOrganization(String organizationId) async {
-    _selectedOrganization = Organization(
-      id: organizationId,
-      name: 'Organization $organizationId',
-    );
+    try {
+      final orgService = locator<OrganizationsService>();
+      final res = await orgService.getOrganization(organizationId);
+      if (!res.isError) {
+        _selectedOrganization = res.value;
+      } else {
+        _selectedOrganization = Organization(id: organizationId, name: 'Organization $organizationId');
+      }
+    } catch (e) {
+      _selectedOrganization = Organization(id: organizationId, name: 'Organization $organizationId');
+    }
     await _storage.saveOrganization(jsonEncode(_selectedOrganization!.toJson()));
     debugPrint('Selected organization: $organizationId');
   }
@@ -205,6 +282,34 @@ class AuthServiceImpl implements AuthService {
       return true;
     } catch (e) {
       debugPrint('Web sign-in error: \\${e.toString()}');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> signInWithInviteToken(String token, {String? name}) async {
+    try {
+      final body = {'token': token};
+      if (name != null) body['name'] = name;
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiConfig.inviteAccept,
+        body: body,
+      );
+
+      if (response.isError) {
+        debugPrint('Invite accept failed: ${response.error}');
+        return false;
+      }
+
+      final authData = response.value; // { token: 'jwt', user: {..} }
+      _jwtToken = authData['token'] as String;
+      _currentUser = User.fromJson(authData['user'] as Map<String, dynamic>);
+      await _storage.saveToken(_jwtToken!);
+      await _storage.saveUser(jsonEncode(_currentUser!.toJson()));
+      debugPrint('Invite accept sign-in success: ${_currentUser!.email}');
+      return true;
+    } catch (e) {
+      debugPrint('Invite sign-in error: $e');
       return false;
     }
   }

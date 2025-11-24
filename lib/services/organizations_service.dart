@@ -52,12 +52,12 @@ class OrganizationsService {
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
     final uri = Uri.parse(ApiConfig.organizations).replace(queryParameters: queryParams);
-
-    return _apiClient.get<OrganizationsResponse>(
-      uri.toString(),
-      headers: await _getAuthHeaders(),
-      fromJson: OrganizationsResponse.fromJson,
-    );
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    // The backend returns an array of organizations, map to OrganizationsResponse
+    final jsonList = res.value as List<dynamic>;
+    final orgs = jsonList.map((o) => Organization.fromJson(o as Map<String, dynamic>)).toList();
+    return Result.success(OrganizationsResponse(organizations: orgs));
   }
 
   Future<Result<Organization, ApiError>> getOrganization(String id) async {

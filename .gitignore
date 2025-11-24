@@ -34,6 +34,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Node.js / NPM
+node_modules/
+**/node_modules/
+
 # Symbolication related
 app.*.symbols
 

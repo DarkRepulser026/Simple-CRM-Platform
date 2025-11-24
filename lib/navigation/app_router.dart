@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/company_selection_screen.dart';
+import '../screens/auth/invite_accept_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/organizations/organizations_list_screen.dart';
 import '../screens/contacts/contacts_list_screen.dart';
@@ -15,6 +16,8 @@ import '../screens/leads/lead_create_screen.dart';
 import '../screens/leads/lead_detail_screen.dart';
 import '../screens/leads/lead_edit_screen.dart';
 import '../screens/admin/users_list_screen.dart';
+import '../screens/admin/invite_user_screen.dart';
+import '../screens/admin/invitations_screen.dart';
 import '../screens/admin/roles_list_screen.dart';
 import '../screens/admin/activity_logs_screen.dart';
 import '../screens/interactions/interactions_list_screen.dart';
@@ -77,6 +80,8 @@ class AppRouter {
   static const String ticketDetail = '/ticket-detail';
   static const String ticketEdit = '/ticket-edit';
   static const String adminUsers = '/admin/users';
+    static const String adminInvite = '/admin/invite';
+    static const String adminInvitations = '/admin/invitations';
   static const String adminRoles = '/admin/roles';
   static const String activityLogs = '/admin/activity-logs';
   static const String interactions = '/interactions';
@@ -121,6 +126,7 @@ class AppRouter {
     return {
       login: (context) => const LoginScreen(),
       companySelection: (context) => const CompanySelectionScreen(),
+      '/invite/accept': (context) => const InviteAcceptScreen(),
       dashboard: (context) => const DashboardScreen(),
       contacts: (context) => const ContactsListScreen(),
       organizations: (context) => const OrganizationsListScreen(),
@@ -133,7 +139,9 @@ class AppRouter {
       tickets: (context) => const TicketsListScreen(),
       ticketCreate: (context) => const TicketCreateScreen(),
       adminUsers: (context) => const UsersListScreen(),
+        adminInvite: (context) => const InviteUserScreen(),
       adminRoles: (context) => const RolesListScreen(),
+      adminInvitations: (context) => const InvitationsScreen(),
       activityLogs: (context) => const ActivityLogsScreen(),
       interactions: (context) => const InteractionsListScreen(),
       contactCreate: (context) => const ContactCreateScreen(),
@@ -213,6 +221,8 @@ class AppRouter {
           return MaterialPageRoute(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
         }
         break;
+        case adminInvite:
+          return MaterialPageRoute(builder: (context) => const InviteUserScreen());
       
     }
     return null;

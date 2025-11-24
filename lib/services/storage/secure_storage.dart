@@ -6,6 +6,7 @@ class SecureStorage {
   static const String _tokenKey = 'jwt_token';
   static const String _userKey = 'current_user';
   static const String _organizationKey = 'selected_organization';
+  static const String _originalTokenKey = 'original_token';
 
   final SharedPreferences _prefs;
 
@@ -67,5 +68,21 @@ class SecureStorage {
     await clearToken();
     await clearUser();
     await clearOrganization();
+    await clearOriginalToken();
+  }
+
+  /// Save original token (for impersonation flows)
+  Future<void> saveOriginalToken(String token) async {
+    await _prefs.setString(_originalTokenKey, token);
+  }
+
+  /// Read original token used to impersonate
+  Future<String?> readOriginalToken() async {
+    return _prefs.getString(_originalTokenKey);
+  }
+
+  /// Clear stored original token
+  Future<void> clearOriginalToken() async {
+    await _prefs.remove(_originalTokenKey);
   }
 }

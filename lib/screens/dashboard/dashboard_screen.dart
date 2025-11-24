@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/dashboard_metrics.dart';
 import '../../services/auth/auth_service.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/service_locator.dart';
 import '../../services/dashboard_service.dart';
 import '../../widgets/error_view.dart';
@@ -50,6 +51,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
         return;
       }
+
+      // If the user is not authenticated, navigate to login
+      if (!_authService.isLoggedIn) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to continue')));
+          AppRouter.replaceWith(context, AppRouter.login);
+        }
+        return;
+      }
+
+      // If the issue is that an organization has not been selected, navigate to company selection
+      if (!_authService.hasSelectedOrganization) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an organization to view dashboard')));
+          AppRouter.navigateTo(context, AppRouter.companySelection);
+        }
+        return;
+      }
+
+      // Otherwise throw to surface the error message
       throw Exception(res.error.message);
     } catch (e) {
       setState(() {
@@ -61,33 +82,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 800;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await _authService.logout();
-              if (mounted) {
-                AppRouter.replaceWith(context, AppRouter.login);
-              }
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+      floatingActionButton: kDebugMode
+          ? FloatingActionButton(
+              mini: true,
+              tooltip: 'Debug info',
+              child: const Icon(Icons.info_outline),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Debug Info'),
+                    content: Text('Logged in: ${_authService.isLoggedIn}\nImpersonating: ${_authService.isImpersonating}\nSelected organization: ${_authService.selectedOrganizationId ?? 'none'}\nJWT present: ${_authService.jwtToken != null}'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+                    ],
+                  ),
+                );
+              },
+            )
+          : null,
       body: Row(
         children: [
-          _buildSidebar(),
+          _buildSidebar(showLogout: !isSmallScreen, showImpersonation: !isSmallScreen),
           Expanded(
-            child: _buildContent(),
+            child: _buildContent(isSmallScreen),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(bool isSmallScreen) {
     if (_isLoading) {
       return const LoadingView(message: 'Loading dashboard...');
     }
@@ -126,20 +155,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome header
-                  Text(
-                    'Welcome back!',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Here\'s your business overview',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  // Welcome header and actions
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome back!',
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (kDebugMode) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Debug: Auth=${_authService.isLoggedIn ? 'yes' : 'no'}  Org=${_authService.selectedOrganizationId ?? 'none'}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                            Text(
+                              'Here\'s your business overview',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Actions moved into the header for small screens when the AppBar is removed
+                      if (isSmallScreen)
+                        Row(
+                          children: [
+                            if (_authService.isImpersonating)
+                              IconButton(
+                                onPressed: () async {
+                                  final ok = await _authService.stopImpersonation();
+                                  if (mounted && ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stopped impersonation')));
+                                    await _loadDashboard();
+                                  }
+                                },
+                                icon: const Icon(Icons.person_off),
+                                tooltip: 'Stop impersonation',
+                              ),
+                            IconButton(
+                              onPressed: () async {
+                                await _authService.logout();
+                                if (mounted) {
+                                  AppRouter.replaceWith(context, AppRouter.login);
+                                }
+                              },
+                              icon: const Icon(Icons.logout),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
 
                   const SizedBox(height: 40),
@@ -373,7 +452,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar({required bool showLogout, required bool showImpersonation}) {
     return Container(
       width: 250,
       color: Theme.of(context).colorScheme.surface,
@@ -425,25 +504,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
           ),
           const Spacer(),
-          // Logout button
-          TextButton.icon(
-            onPressed: () async {
-              await _authService.logout();
-              if (mounted) {
-                AppRouter.replaceWith(context, AppRouter.login);
-              }
-            },
-            icon: const Icon(Icons.logout, size: 16),
-            label: const Text('Logout'),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          // Impersonation and logout buttons (shown on larger screens to avoid duplicate top bar controls)
+          if (showImpersonation)
+            IconButton(
+              onPressed: () async {
+                final ok = await _authService.stopImpersonation();
+                if (mounted && ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stopped impersonation')));
+                  await _loadDashboard();
+                }
+              },
+              icon: const Icon(Icons.person_off),
+              tooltip: 'Stop impersonation',
+            ),
+          if (showLogout)
+            TextButton.icon(
+              onPressed: () async {
+                await _authService.logout();
+                if (mounted) {
+                  AppRouter.replaceWith(context, AppRouter.login);
+                }
+              },
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Logout'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
           ListTile(
             leading: Icon(Icons.business, color: Theme.of(context).colorScheme.primary),

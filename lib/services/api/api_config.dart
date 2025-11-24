@@ -55,6 +55,8 @@ class ApiConfig {
   static String ticketById(String id) => '$baseUrl/tickets/$id';
 
   static String get organizations => '$baseUrl/organizations';
+  static String organizationInvite(String orgId) => '$baseUrl/organizations/$orgId/invite';
+  static String organizationInvites(String orgId) => '$baseUrl/organizations/$orgId/invitations';
   static String organizationById(String id) => '$baseUrl/organizations/$id';
 
   static String get accounts => '$baseUrl/accounts';
@@ -69,4 +71,7 @@ class ApiConfig {
   static String attachmentById(String id) => '$baseUrl/attachments/$id';
 
   static String get dashboard => '$baseUrl/dashboard';
+  static String get inviteAccept => '$baseUrl/invite/accept';
+  static String adminRevokeInvitation(String inviteId) => '$baseUrl/admin/invitations/$inviteId/revoke';
+  static String adminViewAs(String userId) => '$baseUrl/admin/view-as/$userId';
 }

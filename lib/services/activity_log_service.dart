@@ -45,8 +45,12 @@ class ActivityLogService {
     if (entityId != null && entityId.isNotEmpty) queryParams['entityId'] = entityId;
     if (userId != null && userId.isNotEmpty) queryParams['userId'] = userId;
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
-    final uri = Uri.parse(ApiConfig.baseUrl + '/activity_logs').replace(queryParameters: queryParams);
-    return _apiClient.get<ActivityLogsResponse>(uri.toString(), headers: await _getAuthHeaders(), fromJson: ActivityLogsResponse.fromJson);
+    final uri = Uri.parse(ApiConfig.activityLogs).replace(queryParameters: queryParams);
+    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    if (res.isError) return Result.error(res.error);
+    final jsonList = res.value as List<dynamic>;
+    final logs = jsonList.map((l) => ActivityLog.fromJson(l as Map<String, dynamic>)).toList();
+    return Result.success(ActivityLogsResponse(logs: logs));
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {

@@ -18,19 +18,21 @@ model User {
   profileImage String?
   googleId     String?  @unique // For Google OAuth
   isActive     Boolean  @default(true)
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
-  organizations  UserOrganization[]
-  ownedContacts  Contact[]          @relation("ContactOwner")
-  ownedLeads     Lead[]             @relation("LeadOwner")
-  ownedTasks     Task[]             @relation("TaskOwner")
-  createdTasks   Task[]             @relation("TaskCreator")
-  activities     ActivityLog[]
-  tickets        Ticket[]
-  ticketMessages TicketMessage[]
-  Attachment     Attachment[]
+  organizations      UserOrganization[]
+  ownedContacts      Contact[]          @relation("ContactOwner")
+  ownedLeads         Lead[]             @relation("LeadOwner")
+  ownedTasks         Task[]             @relation("TaskOwner")
+  createdTasks       Task[]             @relation("TaskCreator")
+  activities         ActivityLog[]
+  tickets            Ticket[]
+  ticketMessages     TicketMessage[]
+  attachments        Attachment[]
+  createdInvitations Invitation[]
 
   @@map("users")
 }
@@ -49,15 +51,16 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  users      UserOrganization[]
-  contacts   Contact[]
-  leads      Lead[]
-  tasks      Task[]
-  accounts   Account[]
-  roles      UserRole[]
-  activities ActivityLog[]
-  tickets    Ticket[]
-  Attachment Attachment[]
+  users       UserOrganization[]
+  contacts    Contact[]
+  leads       Lead[]
+  tasks       Task[]
+  accounts    Account[]
+  roles       UserRole[]
+  activities  ActivityLog[]
+  tickets     Ticket[]
+  attachments Attachment[]
+  invitations Invitation[]
 
   @@map("organizations")
 }
@@ -369,4 +372,24 @@ model Attachment {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("attachments")
+}
+
+// Invitation model - invitation tokens for user onboarding & role assignment
+model Invitation {
+  id             String       @id @default(cuid())
+  email          String
+  role           UserRoleType
+  organizationId String
+  tokenHash      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User?        @relation(fields: [createdBy], references: [id])
+
+  @@map("invitations")
 }
