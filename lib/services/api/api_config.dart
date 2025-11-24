@@ -3,7 +3,7 @@ import 'dart:io';
 /// Configuration for API client
 class ApiConfig {
   // Base URLs for different environments
-  static const String _developmentUrl = 'http://localhost:3001';
+  static const String _developmentUrl = 'http://localhost:3000';
   static const String _productionUrl = 'https://api.mock.io';
 
   // Get base URL based on debug mode (can be overridden for testing)

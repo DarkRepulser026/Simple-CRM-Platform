@@ -24,6 +24,7 @@ dependencies:
   jwt_decoder: ^2.0.1
   package_info_plus: ^8.0.2
   shared_preferences: ^2.2.2
+  fl_chart: ^0.69.0 
 
 dev_dependencies:
   equatable: ^2.0.5

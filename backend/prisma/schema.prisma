@@ -12,24 +12,25 @@ datasource db {
 
 // User model - represents authenticated users
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String
-  profileImage  String?
-  googleId      String?  @unique // For Google OAuth
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  profileImage String?
+  googleId     String?  @unique // For Google OAuth
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  organizations         UserOrganization[]
-  ownedContacts         Contact[]         @relation("ContactOwner")
-  ownedLeads            Lead[]            @relation("LeadOwner")
-  ownedTasks            Task[]            @relation("TaskOwner")
-  createdTasks          Task[]            @relation("TaskCreator")
-  activities            ActivityLog[]
-  tickets               Ticket[]
-  ticketMessages        TicketMessage[]
+  organizations  UserOrganization[]
+  ownedContacts  Contact[]          @relation("ContactOwner")
+  ownedLeads     Lead[]             @relation("LeadOwner")
+  ownedTasks     Task[]             @relation("TaskOwner")
+  createdTasks   Task[]             @relation("TaskCreator")
+  activities     ActivityLog[]
+  tickets        Ticket[]
+  ticketMessages TicketMessage[]
+  Attachment     Attachment[]
 
   @@map("users")
 }
@@ -48,29 +49,30 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  users       UserOrganization[]
-  contacts    Contact[]
-  leads       Lead[]
-  tasks       Task[]
-  accounts    Account[]
-  roles       UserRole[]
-  activities  ActivityLog[]
-  tickets     Ticket[]
+  users      UserOrganization[]
+  contacts   Contact[]
+  leads      Lead[]
+  tasks      Task[]
+  accounts   Account[]
+  roles      UserRole[]
+  activities ActivityLog[]
+  tickets    Ticket[]
+  Attachment Attachment[]
 
   @@map("organizations")
 }
 
 // Junction table for users and organizations with roles
 model UserOrganization {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   userId         String
   organizationId String
   role           UserRoleType @default(VIEWER)
-  joinedAt       DateTime @default(now())
+  joinedAt       DateTime     @default(now())
 
   // Relations
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
   @@map("user_organizations")
@@ -78,7 +80,7 @@ model UserOrganization {
 
 // Contact model - represents contact persons
 model Contact {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   firstName      String
   lastName       String
   email          String?
@@ -95,58 +97,58 @@ model Contact {
   description    String?
   ownerId        String?
   organizationId String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  owner          User?         @relation("ContactOwner", fields: [ownerId], references: [id])
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tasks          Task[]
-  leads          Lead[]
+  owner        User?        @relation("ContactOwner", fields: [ownerId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  leads        Lead[]
 
   @@map("contacts")
 }
 
 // Lead model - represents sales leads
 model Lead {
-  id                    String     @id @default(cuid())
-  firstName             String
-  lastName              String
-  email                 String?
-  phone                 String?
-  company               String?
-  title                 String?
-  status                LeadStatus @default(NEW)
-  leadSource            LeadSource @default(WEB)
-  industry              String?
-  rating                String?
-  description           String?
-  ownerId               String?
-  organizationId        String
-  contactId             String?
-  isConverted           Boolean    @default(false)
-  convertedAt           DateTime?
-  convertedAccountId    String?
-  convertedContactId    String?
+  id                     String     @id @default(cuid())
+  firstName              String
+  lastName               String
+  email                  String?
+  phone                  String?
+  company                String?
+  title                  String?
+  status                 LeadStatus @default(NEW)
+  leadSource             LeadSource @default(WEB)
+  industry               String?
+  rating                 String?
+  description            String?
+  ownerId                String?
+  organizationId         String
+  contactId              String?
+  isConverted            Boolean    @default(false)
+  convertedAt            DateTime?
+  convertedAccountId     String?
+  convertedContactId     String?
   convertedOpportunityId String?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   // Relations
-  owner                 User?        @relation("LeadOwner", fields: [ownerId], references: [id])
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contact               Contact?     @relation(fields: [contactId], references: [id])
-  tasks                 Task[]
+  owner        User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id])
+  tasks        Task[]
 
   @@map("leads")
 }
 
 // Task model - represents tasks/activities
 model Task {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   subject        String
   description    String?
-  status         TaskStatus  @default(NOT_STARTED)
+  status         TaskStatus   @default(NOT_STARTED)
   priority       TaskPriority @default(NORMAL)
   dueDate        DateTime?
   ownerId        String?
@@ -157,16 +159,16 @@ model Task {
   opportunityId  String?
   caseId         String?
   organizationId String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   // Relations
-  owner          User?        @relation("TaskOwner", fields: [ownerId], references: [id])
-  createdBy      User?        @relation("TaskCreator", fields: [createdById], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contact        Contact?     @relation(fields: [contactId], references: [id])
-  lead           Lead?        @relation(fields: [leadId], references: [id])
-  account        Account?     @relation("TaskAccount", fields: [accountId], references: [id])
+  owner        User?        @relation("TaskOwner", fields: [ownerId], references: [id])
+  createdBy    User?        @relation("TaskCreator", fields: [createdById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id])
+  lead         Lead?        @relation(fields: [leadId], references: [id])
+  account      Account?     @relation("TaskAccount", fields: [accountId], references: [id])
 
   @@map("tasks")
 }
@@ -183,27 +185,27 @@ model Account {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tasks          Task[]       @relation("TaskAccount")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks        Task[]       @relation("TaskAccount")
 
   @@map("accounts")
 }
 
 // UserRole model - represents roles and permissions
 model UserRole {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
   description    String?
   roleType       UserRoleType
   permissions    Permission[]
   organizationId String
-  isDefault      Boolean       @default(false)
-  isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  isDefault      Boolean      @default(false)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   // Relations
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, name])
   @@map("user_roles")
@@ -211,7 +213,7 @@ model UserRole {
 
 // ActivityLog model - for audit logging
 model ActivityLog {
-  id             String      @id @default(cuid())
+  id             String   @id @default(cuid())
   action         String
   entityType     String
   entityId       String
@@ -219,48 +221,48 @@ model ActivityLog {
   userId         String?
   organizationId String
   metadata       Json?
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
-  user           User?         @relation(fields: [userId], references: [id])
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("activity_logs")
 }
 
 // Ticket model - for support tickets
 model Ticket {
-  id             String       @id @default(cuid())
+  id             String         @id @default(cuid())
   subject        String
   description    String?
-  status         TicketStatus @default(OPEN)
+  status         TicketStatus   @default(OPEN)
   priority       TicketPriority @default(NORMAL)
   category       String?
   ownerId        String?
   organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   // Relations
-  owner          User?          @relation(fields: [ownerId], references: [id])
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  messages       TicketMessage[]
+  owner        User?           @relation(fields: [ownerId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     TicketMessage[]
 
   @@map("tickets")
 }
 
 // TicketMessage model - messages within tickets
 model TicketMessage {
-  id        String   @id @default(cuid())
-  content   String
-  isInternal Boolean @default(false)
-  ticketId  String
-  authorId  String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  content    String
+  isInternal Boolean  @default(false)
+  ticketId   String
+  authorId   String
+  createdAt  DateTime @default(now())
 
   // Relations
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id])
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
 
   @@map("ticket_messages")
 }
@@ -363,8 +365,8 @@ model Attachment {
   createdAt      DateTime @default(now())
 
   // Relations
-  user           User?        @relation(fields: [uploadedBy], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [uploadedBy], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("attachments")
 }
