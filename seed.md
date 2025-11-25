@@ -1,6 +1,6 @@
 # 1. Login / Authenticate using your Google mocked auth
 # Sends a POST request to /auth/google to receive a JWT token.
-$ TOKEN=$(curl -s -X POST "http://localhost:3001/auth/google" \
+TOKEN=$(curl -s -X POST "http://localhost:3001/auth/google" \
     -H "Content-Type: application/json" \
     -d '{"email":"minecraftthanhloi@gmail.com", "name":"Root Admin", "googleId":"minecraftthanhloi@gmail.com"}' | jq -r .token)
 

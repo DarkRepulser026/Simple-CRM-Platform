@@ -65,6 +65,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final authService = locator<AuthService>();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Allow direct deep links (e.g., /invite/accept) or hash route fragments to render.
+      var currentPath = Uri.base.path;
+      if (Uri.base.fragment.isNotEmpty) {
+        final frag = Uri.base.fragment.split('?').first;
+        if (frag.isNotEmpty) currentPath = frag;
+      }
+
+      try {
+        if (currentPath != '/' && currentPath.isNotEmpty) {
+          // Navigate to the requested route from the URL (deep link)
+          AppRouter.replaceWith(context, currentPath);
+          return;
+        }
+      } catch (e) {
+        debugPrint('Deep link navigation error: $e');
+        // Continue to default redirect behaviour below
+      }
+
       if (authService.isLoggedIn) {
         if (authService.hasSelectedOrganization) {
           AppRouter.replaceWith(context, AppRouter.dashboard);

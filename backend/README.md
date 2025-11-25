@@ -22,7 +22,7 @@ A Node.js API server using Express.js and Prisma ORM with PostgreSQL.
    - Create a new project or select existing one
    - Enable the Google+ API
    - Create OAuth 2.0 credentials (Client ID and Client Secret)
-   - Add authorized redirect URI: `http://localhost:3000/auth/google/callback`
+  - Add authorized redirect URI: `http://localhost:3001/auth/google/callback`
 
 3. Configure environment variables:
    - Copy `.env.example` to `.env`
@@ -119,6 +119,13 @@ Prisma ORM works on the backend (Node.js) and isn't used directly in Flutter. Us
 - `PUT /organizations/:id` - Update organization
 - `DELETE /organizations/:id` - Delete organization
 
+### Accounts
+- `GET /accounts` - List accounts within the organization (requires X-Organization-ID)
+- `POST /accounts` - Create an account (requires `CREATE_CONTACTS` permission)
+- `GET /accounts/:id` - Get account details (requires `VIEW_CONTACTS` permission)
+- `PUT /accounts/:id` - Update account (requires `EDIT_CONTACTS` permission)
+- `DELETE /accounts/:id` - Delete account (requires `DELETE_CONTACTS` permission)
+
 ### Contacts
 - `GET /contacts` - List contacts (requires X-Organization-ID header)
 - `POST /contacts` - Create contact
@@ -163,6 +170,14 @@ Prisma ORM works on the backend (Node.js) and isn't used directly in Flutter. Us
 
 ### Dashboard
 - `GET /dashboard` - Get dashboard statistics
+
+### Activity Logs
+- `GET /activity_logs` - List activity/audit logs (requires `VIEW_AUDIT_LOGS` permission). Supports query parameters: `page`, `limit`, `entityType`, `entityId`, `userId`, `search`.
+
+The response includes the following structure for each log:
+- `id`, `activityType` (string), `description`, `userId`, `userName`, `entityId`, `entityType`, `entityName`, `organizationId`, `createdAt`
+- `metadata` (JSON) — optional additional details
+- `oldValues` and `newValues` — optional top-level fields that contain pre-update and post-update data (when available). These are also included under `metadata.oldValues` / `metadata.newValues`.
 
 ## Authentication
 
@@ -218,7 +233,7 @@ node test-db.js
 - `JWT_SECRET` - Secret key for JWT tokens (generate with `openssl rand -base64 48`)
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID from Google Cloud Console
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret (keep secure!)
-- `GOOGLE_REDIRECT_URI` - OAuth callback URL (default: http://localhost:3000/auth/google/callback)
+ - `GOOGLE_REDIRECT_URI` - OAuth callback URL (default: http://localhost:3001/auth/google/callback)
 - `SESSION_SECRET` - Session secret for Passport (generate with `openssl rand -hex 32`)
 - `PORT` - Server port (default: 3000)
 

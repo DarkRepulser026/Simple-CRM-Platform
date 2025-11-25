@@ -41,11 +41,21 @@ async function checkDatabaseConnection(retries = 3, delayMs = 1000) {
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Ensure GOOGLE_REDIRECT_URI falls back to the backend server's callback route
+const DEFAULT_GOOGLE_REDIRECT_URI = `http://localhost:${PORT}/auth/google/callback`;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || DEFAULT_GOOGLE_REDIRECT_URI;
+
+// Log basic Google OAuth configuration for debugging (don't print secrets)
+console.log('Google OAuth config:');
+console.log(' - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '***REDACTED' : 'not set');
+console.log(' - GOOGLE_REDIRECT_URI:', GOOGLE_REDIRECT_URI);
+console.log(' - Passport callbackURL used for GoogleStrategy:', GOOGLE_REDIRECT_URI);
+
 // Passport configuration
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_REDIRECT_URI
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: GOOGLE_REDIRECT_URI
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -98,6 +108,8 @@ passport.deserializeUser(async (id, done) => {
     done(error, null);
   }
 });
+
+// User Role endpoints were moved below near user endpoints to ensure middleware is initialized
 
 // Middleware
 // Configure CORS explicitly for known local dev origin and allow required headers
@@ -244,6 +256,42 @@ const getUserPermissions = async (userId, organizationId) => {
   return role.permissions || [];
 };
 
+// Centralized helper to create activity log entries (standardizes metadata & optional activity options)
+const createActivityLogEntry = async ({ action, entityType, entityId, description, userId, organizationId, metadata = null }) => {
+  try {
+    const data = { action, entityType, entityId, description, userId, organizationId };
+    if (metadata) data.metadata = metadata;
+    return await prisma.activityLog.create({ data });
+  } catch (e) {
+    console.error('createActivityLogEntry error:', e);
+    // Non-blocking: swallowing error is safer than failing API call, but log for investigation
+    return null;
+  }
+};
+
+// Helpers to map user-provided role and permission strings to Prisma enum values
+const normalizeRoleType = (value) => {
+  if (!value) return null;
+  const v = String(value).toUpperCase().replace(/[^A-Z_]/g, '_');
+  const allowed = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+  return allowed.includes(v) ? v : null;
+};
+
+const ALLOWED_PERMISSIONS = [
+  'VIEW_CONTACTS','CREATE_CONTACTS','EDIT_CONTACTS','DELETE_CONTACTS','VIEW_LEADS','CREATE_LEADS','EDIT_LEADS','DELETE_LEADS','CONVERT_LEADS',
+  'VIEW_TICKETS','CREATE_TICKETS','EDIT_TICKETS','DELETE_TICKETS','ASSIGN_TICKETS','RESOLVE_TICKETS',
+  'VIEW_TASKS','CREATE_TASKS','EDIT_TASKS','DELETE_TASKS','ASSIGN_TASKS',
+  'VIEW_DASHBOARD','VIEW_REPORTS','MANAGE_USERS','MANAGE_ROLES','MANAGE_ORGANIZATION','VIEW_AUDIT_LOGS'
+];
+
+const normalizePermissionsArray = (arr) => {
+  if (!arr || !Array.isArray(arr)) return [];
+  const mapped = arr.map((p) => String(p).toUpperCase().replace(/[^A-Z_]/g, '_'));
+  const invalid = mapped.filter(p => !ALLOWED_PERMISSIONS.includes(p));
+  if (invalid.length) return null; // invalid permissions present
+  return mapped;
+};
+
 // Authorization middleware - requires at least one permission to pass
 const authorize = (requiredPermissions) => {
   return async (req, res, next) => {
@@ -299,6 +347,15 @@ const validateOrganization = (req, res, next) => {
   const { name } = req.body;
   if (!name) {
     return res.status(400).json({ message: 'Name is required' });
+  }
+  next();
+};
+
+// Account input validation
+const validateAccount = (req, res, next) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ message: 'Account name is required' });
   }
   next();
 };
@@ -499,17 +556,18 @@ app.get('/contacts/:id', authenticateToken, requireOrganization, async (req, res
 
 app.put('/contacts/:id', authenticateToken, requireOrganization, authorize(['EDIT_CONTACTS']), async (req, res) => {
   try {
-    const contact = await prisma.contact.updateMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      },
-      data: req.body
+    const existing = await prisma.contact.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!existing) return res.status(404).json({ message: 'Contact not found' });
+    // prepare old/new for fields provided in body
+    const oldValues = {};
+    const newValues = {};
+    Object.keys(req.body).forEach((k) => {
+      oldValues[k] = existing[k];
+      newValues[k] = req.body[k];
     });
-    if (contact.count === 0) {
-      return res.status(404).json({ message: 'Contact not found' });
-    }
-    res.json({ message: 'Contact updated' });
+    const updated = await prisma.contact.update({ where: { id: req.params.id }, data: req.body });
+    await createActivityLogEntry({ action: 'CONTACT_UPDATED', entityType: 'Contact', entityId: updated.id, description: `Contact updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -598,7 +656,7 @@ app.post('/organizations/:id/invite', authenticateToken, requireOrganization, au
     // Send invite email (uses nodemailer if configured)
     const link = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/invite/accept?token=${token}`;
     await mailer.sendInviteEmail(email, link, role);
-    await prisma.activityLog.create({ data: { action: 'INVITE_CREATED', entityType: 'Invitation', entityId: orgId, description: `${req.user.email} invited ${email} as ${role}`, userId: req.user.id, organizationId: orgId } });
+    await createActivityLogEntry({ action: 'INVITE_CREATED', entityType: 'Invitation', entityId: orgId, description: `${req.user.email} invited ${email} as ${role}`, userId: req.user.id, organizationId: orgId });
     res.json({ success: true });
   } catch (err) {
     console.error('Create invite error', err);
@@ -619,6 +677,22 @@ app.post('/invite/accept', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
     const { email, orgId, role } = payload;
+
+    // If the client provided an auth header, verify that the auth'd user's email matches the invite email
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+      try {
+        const authToken = authHeader.split(' ')[1];
+        const authPayload = jwt.verify(authToken, JWT_SECRET);
+        // If the token resolves to an email that differs, reject — we don't allow accepting invites on behalf of others
+        if (authPayload && authPayload.email && authPayload.email !== email) {
+          return res.status(403).json({ message: 'Authenticated user does not match invite email' });
+        }
+      } catch (e) {
+        console.error('Invalid authorization token on invite accept:', e);
+        return res.status(403).json({ message: 'Invalid authorization token' });
+      }
+    }
     // Check token hash against stored invitation
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const inv = await prisma.invitation.findFirst({ where: { tokenHash, organizationId: orgId, email, acceptedAt: null } });
@@ -649,7 +723,9 @@ app.post('/invite/accept', async (req, res) => {
     if (role === 'ADMIN') {
       res.cookie('admin_session', newToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 24 * 60 * 60 * 1000 });
     }
-    res.json({ token: newToken, user: { id: user.id, email: user.email, name: user.name } });
+    // Also include organization context in response so the web UI can auto-select org after acceptance
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    res.json({ token: newToken, user: { id: user.id, email: user.email, name: user.name }, organization: org ? { id: org.id, name: org.name } : { id: orgId } , role });
   } catch (err) {
     console.error('Invite accept error', err);
     res.status(500).json({ message: err.message });
@@ -680,7 +756,7 @@ app.post('/invite/accept', async (req, res) => {
       const perms = await getUserPermissions(req.user.id, req.organizationId);
       if (!perms.includes('MANAGE_USERS')) return res.status(403).json({ message: 'Forbidden' });
       await prisma.invitation.update({ where: { id: invId }, data: { revokedAt: new Date() } });
-      await prisma.activityLog.create({ data: { action: 'INVITE_REVOKED', entityType: 'Invitation', entityId: invId, description: `${req.user.email} revoked invite ${inv.email}`, userId: req.user.id, organizationId: inv.organizationId } });
+      await createActivityLogEntry({ action: 'INVITE_REVOKED', entityType: 'Invitation', entityId: invId, description: `${req.user.email} revoked invite ${inv.email}`, userId: req.user.id, organizationId: inv.organizationId });
       res.json({ success: true });
     } catch (err) {
       console.error('Revoke invitation error:', err);
@@ -725,7 +801,7 @@ app.post('/admin/view-as/:userId', authenticateToken, requireOrganization, autho
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
     const impersonationToken = jwt.sign({ id: targetUser.id, email: targetUser.email, tokenVersion: targetUser.tokenVersion || 0, impersonatorId: req.user.id }, JWT_SECRET, { expiresIn: '30m' });
-    await prisma.activityLog.create({ data: { action: 'IMPERSONATION', entityType: 'User', entityId: targetUser.id, description: `${req.user.email} impersonated ${targetUser.email}`, userId: req.user.id, organizationId: req.organizationId } });
+    await createActivityLogEntry({ action: 'IMPERSONATION', entityType: 'User', entityId: targetUser.id, description: `${req.user.email} impersonated ${targetUser.email}`, userId: req.user.id, organizationId: req.organizationId });
     res.json({ token: impersonationToken });
   } catch (err) {
     console.error('Impersonation error:', err);
@@ -790,6 +866,162 @@ app.post('/leads', authenticateToken, requireOrganization, authorize(['CREATE_LE
   }
 });
 
+// Accounts routes: CRUD, paginated list
+app.get('/accounts', authenticateToken, requireOrganization, authorize(['VIEW_CONTACTS']), async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || '20', 10), 1);
+    const search = req.query.search ? String(req.query.search) : null;
+    const where = { organizationId: req.organizationId };
+    const prismaFilter = { where: { organizationId: req.organizationId } };
+    if (search) {
+      prismaFilter.where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { type: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const total = await prisma.account.count(prismaFilter);
+    const accounts = await prisma.account.findMany({
+      ...prismaFilter,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({
+      accounts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      }
+    });
+  } catch (err) {
+    console.error('List accounts error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/accounts', authenticateToken, requireOrganization, authorize(['CREATE_CONTACTS']), validateAccount, async (req, res) => {
+  try {
+    const data = { ...req.body, organizationId: req.organizationId };
+    const acc = await prisma.account.create({ data });
+    await createActivityLogEntry({ action: 'ACCOUNT_CREATED', entityType: 'Account', entityId: acc.id, description: `Account ${acc.name} created`, userId: req.user.id, organizationId: req.organizationId });
+    res.status(201).json(acc);
+  } catch (err) {
+    console.error('Create account error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.get('/accounts/:id', authenticateToken, requireOrganization, authorize(['VIEW_CONTACTS']), async (req, res) => {
+  try {
+    const account = await prisma.account.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    res.json(account);
+  } catch (err) {
+    console.error('Get account error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.put('/accounts/:id', authenticateToken, requireOrganization, authorize(['EDIT_CONTACTS']), async (req, res) => {
+  try {
+    const existing = await prisma.account.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!existing) return res.status(404).json({ message: 'Account not found' });
+    const oldValues = {};
+    const newValues = {};
+    Object.keys(req.body).forEach((k) => {
+      oldValues[k] = existing[k];
+      newValues[k] = req.body[k];
+    });
+    const updated = await prisma.account.update({ where: { id: req.params.id }, data: req.body });
+    await createActivityLogEntry({ action: 'ACCOUNT_UPDATED', entityType: 'Account', entityId: updated.id, description: `Account updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    res.json(updated);
+  } catch (err) {
+    console.error('Update account error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.delete('/accounts/:id', authenticateToken, requireOrganization, authorize(['DELETE_CONTACTS']), async (req, res) => {
+  try {
+    const del = await prisma.account.deleteMany({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (del.count === 0) return res.status(404).json({ message: 'Account not found' });
+    await createActivityLogEntry({ action: 'ACCOUNT_DELETED', entityType: 'Account', entityId: req.params.id, description: `Account deleted by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId });
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Activity Logs - list with filtering/paging
+app.get('/activity_logs', authenticateToken, requireOrganization, authorize(['VIEW_AUDIT_LOGS']), async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || '20', 10), 1);
+    const entityType = req.query.entityType ? String(req.query.entityType) : null;
+    const entityId = req.query.entityId ? String(req.query.entityId) : null;
+    const userId = req.query.userId ? String(req.query.userId) : null;
+    const search = req.query.search ? String(req.query.search) : null;
+    const where = { organizationId: req.organizationId };
+    const filters = { where: { organizationId: req.organizationId } };
+    // Build search filters
+    const whereClauses = [];
+    if (entityType) whereClauses.push({ entityType });
+    if (entityId) whereClauses.push({ entityId });
+    if (userId) whereClauses.push({ userId });
+    if (search) {
+      whereClauses.push({ description: { contains: search, mode: 'insensitive' } });
+    }
+    if (whereClauses.length > 0) filters.where.AND = whereClauses;
+
+    const total = await prisma.activityLog.count(filters);
+    const logs = await prisma.activityLog.findMany({
+      ...filters,
+      include: { user: { select: { id: true, email: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    // Map to friendly response expected by frontend
+    const mapped = await Promise.all(logs.map(async (l) => {
+      // Attempt to enrich entity name if possible
+      let entityName = null;
+      if (l.entityType === 'Account') {
+        try {
+          const acc = await prisma.account.findUnique({ where: { id: l.entityId } });
+          entityName = acc ? acc.name : null;
+        } catch (e) {
+          entityName = null;
+        }
+      }
+      return {
+        id: l.id,
+        activityType: l.action || 'Other',
+        description: l.description,
+        userId: l.userId,
+        userName: l.user ? l.user.name || l.user.email : null,
+        entityId: l.entityId,
+        entityType: l.entityType,
+        entityName,
+        organizationId: l.organizationId,
+        metadata: l.metadata || null,
+        oldValues: l.metadata && l.metadata.oldValues ? l.metadata.oldValues : null,
+        newValues: l.metadata && l.metadata.newValues ? l.metadata.newValues : null,
+        createdAt: l.createdAt,
+      };
+    }));
+    return res.json({ logs: mapped, pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
+  } catch (err) {
+    console.error('List activity logs error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.get('/leads/:id', authenticateToken, requireOrganization, async (req, res) => {
   try {
     const lead = await prisma.lead.findFirst({
@@ -813,17 +1045,14 @@ app.get('/leads/:id', authenticateToken, requireOrganization, async (req, res) =
 
 app.put('/leads/:id', authenticateToken, requireOrganization, authorize(['EDIT_LEADS']), async (req, res) => {
   try {
-    const lead = await prisma.lead.updateMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      },
-      data: req.body
-    });
-    if (lead.count === 0) {
-      return res.status(404).json({ message: 'Lead not found' });
-    }
-    res.json({ message: 'Lead updated' });
+    const existing = await prisma.lead.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!existing) return res.status(404).json({ message: 'Lead not found' });
+    const oldValues = {};
+    const newValues = {};
+    Object.keys(req.body).forEach((k) => { oldValues[k] = existing[k]; newValues[k] = req.body[k]; });
+    const updated = await prisma.lead.update({ where: { id: req.params.id }, data: req.body });
+    await createActivityLogEntry({ action: 'LEAD_UPDATED', entityType: 'Lead', entityId: updated.id, description: `Lead updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -902,17 +1131,14 @@ app.get('/tasks/:id', authenticateToken, requireOrganization, async (req, res) =
 
 app.put('/tasks/:id', authenticateToken, requireOrganization, authorize(['EDIT_TASKS']), async (req, res) => {
   try {
-    const task = await prisma.task.updateMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      },
-      data: req.body
-    });
-    if (task.count === 0) {
-      return res.status(404).json({ message: 'Task not found' });
-    }
-    res.json({ message: 'Task updated' });
+    const existing = await prisma.task.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!existing) return res.status(404).json({ message: 'Task not found' });
+    const oldValues = {};
+    const newValues = {};
+    Object.keys(req.body).forEach((k) => { oldValues[k] = existing[k]; newValues[k] = req.body[k]; });
+    const updated = await prisma.task.update({ where: { id: req.params.id }, data: req.body });
+    await createActivityLogEntry({ action: 'TASK_UPDATED', entityType: 'Task', entityId: updated.id, description: `Task updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -999,17 +1225,14 @@ app.get('/tickets/:id', authenticateToken, requireOrganization, async (req, res)
 
 app.put('/tickets/:id', authenticateToken, requireOrganization, authorize(['EDIT_TICKETS']), async (req, res) => {
   try {
-    const ticket = await prisma.ticket.updateMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      },
-      data: req.body
-    });
-    if (ticket.count === 0) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
-    res.json({ message: 'Ticket updated' });
+    const existing = await prisma.ticket.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    if (!existing) return res.status(404).json({ message: 'Ticket not found' });
+    const oldValues = {};
+    const newValues = {};
+    Object.keys(req.body).forEach((k) => { oldValues[k] = existing[k]; newValues[k] = req.body[k]; });
+    const updated = await prisma.ticket.update({ where: { id: req.params.id }, data: req.body });
+    await createActivityLogEntry({ action: 'TICKET_UPDATED', entityType: 'Ticket', entityId: updated.id, description: `Ticket updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1072,7 +1295,7 @@ app.get('/organizations', authenticateToken, async (req, res) => {
         organization: true
       }
     });
-    const organizations = userOrganizations.map(uo => uo.organization);
+    const organizations = userOrganizations.map(uo => ({ ...uo.organization, role: uo.role }));
     res.json(organizations);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1117,7 +1340,8 @@ app.get('/organizations/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Organization not found' });
     }
 
-    res.json(userOrg.organization);
+    // Attach user's role in organization to response for frontend convenience
+    res.json({ ...userOrg.organization, role: userOrg.role });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1163,10 +1387,203 @@ app.put('/organizations/:id/users/:userId/role', authenticateToken, requireOrgan
     await prisma.userOrganization.update({ where: { id: userOrg.id }, data: { role } });
     // Revoke tokens by incrementing tokenVersion
     await prisma.user.update({ where: { id: targetUserId }, data: { tokenVersion: { increment: 1 } } });
-    await prisma.activityLog.create({ data: { action: 'USER_ROLE_UPDATED', entityType: 'UserOrganization', entityId: userOrg.id, description: `${req.user.email} changed role for user ${targetUserId} to ${role}`, userId: req.user.id, organizationId: orgId } });
+    await createActivityLogEntry({ action: 'USER_ROLE_UPDATED', entityType: 'UserOrganization', entityId: userOrg.id, description: `${req.user.email} changed role for user ${targetUserId} to ${role}`, userId: req.user.id, organizationId: orgId });
     res.json({ success: true });
   } catch (err) {
     console.error('Update user role error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+  // User Role endpoints (organization-scoped)
+  app.get('/user_roles', authenticateToken, requireOrganization, async (req, res) => {
+    try {
+      const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+      const limit = Math.max(parseInt(req.query.limit || '20', 10), 1);
+      const total = await prisma.userRole.count({ where: { organizationId: req.organizationId } });
+      let roles = await prisma.userRole.findMany({ where: { organizationId: req.organizationId }, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } });
+      roles = roles.map(r => ({ ...r, permissions: (r.permissions || []).map(p => String(p).toLowerCase()) }));
+      return res.json({ roles, pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
+    } catch (err) {
+      console.error('List roles error:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/user_roles', authenticateToken, requireOrganization, authorize(['MANAGE_ROLES']), async (req, res) => {
+    try {
+      const { name, description, roleType, permissions, isDefault, isActive } = req.body;
+      if (!name) return res.status(400).json({ message: 'Name is required' });
+      const normalizedRoleType = normalizeRoleType(roleType);
+      if (!normalizedRoleType) return res.status(400).json({ message: 'Invalid roleType' });
+      const perms = normalizePermissionsArray(permissions);
+      if (perms === null) return res.status(400).json({ message: 'Invalid permissions array' });
+      const created = await prisma.userRole.create({ data: { name, description, roleType: normalizedRoleType, permissions: perms, organizationId: req.organizationId, isDefault: !!isDefault, isActive: isActive !== false } });
+      await createActivityLogEntry({ action: 'ROLE_CREATED', entityType: 'UserRole', entityId: created.id, description: `${req.user.email} created role ${created.name}`, userId: req.user.id, organizationId: req.organizationId });
+      created.permissions = (created.permissions || []).map(p => String(p).toLowerCase());
+      res.status(201).json(created);
+    } catch (err) {
+      console.error('Create role error:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put('/user_roles/:id', authenticateToken, requireOrganization, authorize(['MANAGE_ROLES']), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const existing = await prisma.userRole.findUnique({ where: { id } });
+      if (!existing || existing.organizationId !== req.organizationId) return res.status(404).json({ message: 'Role not found' });
+      const data = {};
+      if (req.body.name) data.name = req.body.name;
+      if (req.body.description !== undefined) data.description = req.body.description;
+      if (req.body.roleType) {
+        const normalized = normalizeRoleType(req.body.roleType);
+        if (!normalized) return res.status(400).json({ message: 'Invalid roleType' });
+        data.roleType = normalized;
+      }
+      if (req.body.permissions !== undefined) {
+        const perms2 = normalizePermissionsArray(req.body.permissions);
+        if (perms2 === null) return res.status(400).json({ message: 'Invalid permissions array' });
+        data.permissions = perms2;
+      }
+      if (req.body.isDefault !== undefined) data.isDefault = !!req.body.isDefault;
+      if (req.body.isActive !== undefined) data.isActive = !!req.body.isActive;
+      const updated = await prisma.userRole.update({ where: { id }, data });
+      const oldValues = { name: existing.name, roleType: existing.roleType, permissions: existing.permissions, description: existing.description, isDefault: existing.isDefault, isActive: existing.isActive };
+      const newValues = { ...data };
+      await createActivityLogEntry({ action: 'ROLE_UPDATED', entityType: 'UserRole', entityId: updated.id, description: `${req.user.email} updated role ${updated.name}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+      res.json(updated);
+    } catch (err) {
+      console.error('Update role error:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete('/user_roles/:id', authenticateToken, requireOrganization, authorize(['MANAGE_ROLES']), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const existing = await prisma.userRole.findUnique({ where: { id } });
+      if (!existing || existing.organizationId !== req.organizationId) return res.status(404).json({ message: 'Role not found' });
+      if (existing.isDefault) return res.status(400).json({ message: 'Cannot delete default role' });
+      await prisma.userRole.delete({ where: { id } });
+      await createActivityLogEntry({ action: 'ROLE_DELETED', entityType: 'UserRole', entityId: id, description: `${req.user.email} deleted role ${existing.name}`, userId: req.user.id, organizationId: req.organizationId });
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Delete role error:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+// Users endpoints
+// List users (paginated) - require organization scope
+app.get('/users', authenticateToken, requireOrganization, async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || '20', 10), 1);
+    const search = req.query.search ? String(req.query.search) : null;
+    const where = { organizationId: req.organizationId };
+    const filter = { where: { organizationId: req.organizationId } };
+    if (search) {
+      filter.where.OR = [
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { name: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+    // join userOrganization to list users within organization
+    const total = await prisma.userOrganization.count({ where: filter.where });
+    const userOrgs = await prisma.userOrganization.findMany({
+      where: filter.where,
+      include: { user: true },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { joinedAt: 'desc' }
+    });
+    const users = userOrgs.map(uo => ({ ...uo.user, role: uo.role }));
+    return res.json({ users, pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
+  } catch (err) {
+    console.error('List users error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Create user
+app.post('/users', authenticateToken, requireOrganization, authorize(['MANAGE_USERS']), async (req, res) => {
+  try {
+    const { email, name, role, isActive } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+    // If user exists, return 409
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (user) return res.status(409).json({ message: 'User already exists' });
+    user = await prisma.user.create({ data: { email, name, isActive: isActive !== false } });
+    // Associate user into organization
+    await prisma.userOrganization.create({ data: { userId: user.id, organizationId: req.organizationId, role: role || 'VIEWER' } });
+    await createActivityLogEntry({ action: 'USER_CREATED', entityType: 'User', entityId: user.id, description: `${req.user.email} created user ${user.email}`, userId: req.user.id, organizationId: req.organizationId });
+    res.status(201).json(user);
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get user by id (org scoped)
+app.get('/users/:id', authenticateToken, requireOrganization, async (req, res) => {
+  try {
+    const uo = await prisma.userOrganization.findFirst({ where: { userId: req.params.id, organizationId: req.organizationId }, include: { user: true } });
+    if (!uo) return res.status(404).json({ message: 'User not found in organization' });
+    const user = { ...uo.user, role: uo.role };
+    res.json(user);
+  } catch (err) {
+    console.error('Get user error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update user info
+app.put('/users/:id', authenticateToken, requireOrganization, async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    // If not the same user, must have MANAGE_USERS
+    if (req.user.id !== targetUserId) {
+      const perms = await getUserPermissions(req.user.id, req.organizationId);
+      if (!perms.includes('MANAGE_USERS')) return res.status(403).json({ message: 'Forbidden' });
+    }
+    const existing = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!existing) return res.status(404).json({ message: 'User not found' });
+    const data = { ...req.body };
+    // If role is provided, use the organization role endpoint which also revokes tokens if needed
+    if (data.role) {
+      const existingUserOrg = await prisma.userOrganization.findFirst({ where: { userId: targetUserId, organizationId: req.organizationId } });
+      const role = data.role;
+      delete data.role;
+      await prisma.userOrganization.updateMany({ where: { userId: targetUserId, organizationId: req.organizationId }, data: { role } });
+      await prisma.user.update({ where: { id: targetUserId }, data: { tokenVersion: { increment: 1 } } });
+      await createActivityLogEntry({ action: 'USER_ROLE_UPDATED', entityType: 'UserOrganization', entityId: targetUserId, description: `${req.user.email} changed role for user ${targetUserId} to ${role}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues: { role: existingUserOrg ? existingUserOrg.role : null }, newValues: { role } } });
+    }
+    // Update user info
+    const updated = await prisma.user.update({ where: { id: targetUserId }, data });
+    // Capture old/new for audit
+    const oldValues = { name: existing.name, email: existing.email, isActive: existing.isActive, profileImage: existing.profileImage };
+    const newValues = { ...data };
+    await createActivityLogEntry({ action: 'USER_UPDATED', entityType: 'User', entityId: updated.id, description: `${req.user.email} updated user ${updated.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
+    updated.permissions = (updated.permissions || []).map(p => String(p).toLowerCase());
+    res.json(updated);
+  } catch (err) {
+    console.error('Update user error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Delete user (remove association or delete user)
+app.delete('/users/:id', authenticateToken, requireOrganization, authorize(['MANAGE_USERS']), async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    // Delete user association for this organization
+    const del = await prisma.userOrganization.deleteMany({ where: { userId: targetUserId, organizationId: req.organizationId } });
+    if (del.count === 0) return res.status(404).json({ message: 'User not found in organization' });
+    await createActivityLogEntry({ action: 'USER_DELETED', entityType: 'User', entityId: targetUserId, description: `${req.user.email} removed user ${targetUserId} from org`, userId: req.user.id, organizationId: req.organizationId });
+    res.json({ message: 'User removed from organization' });
+  } catch (err) {
+    console.error('Delete user error:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -1200,12 +1617,20 @@ app.delete('/organizations/:id', authenticateToken, async (req, res) => {
 app.get('/dashboard', authenticateToken, requireOrganization, async (req, res) => {
   try {
     // Get counts for dashboard
-    const [contactCount, leadCount, taskCount, ticketCount] = await Promise.all([
+    const [contactCount, leadCount, taskCount, ticketCount, usersCount, accountCount] = await Promise.all([
       prisma.contact.count({ where: { organizationId: req.organizationId } }),
       prisma.lead.count({ where: { organizationId: req.organizationId } }),
       prisma.task.count({ where: { organizationId: req.organizationId } }),
-      prisma.ticket.count({ where: { organizationId: req.organizationId } })
+      prisma.ticket.count({ where: { organizationId: req.organizationId } }),
+      prisma.userOrganization.count({ where: { organizationId: req.organizationId } }),
+      prisma.account.count({ where: { organizationId: req.organizationId } })
     ]);
+
+    // Check basic system health (DB connectivity)
+    const dbConnected = await checkDatabaseConnection(1, 0);
+
+    // Get counts for organizations (system-wide metric)
+    const organizationsCount = await prisma.organization.count();
 
     // Get recent activities
     const recentActivities = await prisma.activityLog.findMany({
@@ -1238,17 +1663,84 @@ app.get('/dashboard', authenticateToken, requireOrganization, async (req, res) =
       _count: { status: true }
     });
 
+    // Build a map of ticket status counts for convenient lookup
+    const ticketsByStatus = {};
+    ticketStats.forEach((s) => { ticketsByStatus[s.status] = s._count.status; });
+
+    // Tickets by priority
+    const ticketPriorityStats = await prisma.ticket.groupBy({
+      by: ['priority'],
+      where: { organizationId: req.organizationId },
+      _count: { priority: true }
+    });
+
+    // Tickets by agent (owner)
+    const ticketsByAgentRaw = await prisma.ticket.groupBy({
+      by: ['ownerId'],
+      where: { organizationId: req.organizationId },
+      _count: { ownerId: true }
+    });
+    const ticketsByAgent = {};
+    ticketsByAgentRaw.forEach(a => { ticketsByAgent[a.ownerId || 'unassigned'] = a._count.ownerId; });
+
+    // Calculate ticket load: open tickets per assigned agent (agents & managers)
+    const openTickets = ticketsByStatus['OPEN'] ?? ticketsByStatus['Open'] ?? ticketsByStatus['open'] ?? 0;
+    const agentCount = await prisma.userOrganization.count({ where: { organizationId: req.organizationId, role: { in: ['AGENT', 'MANAGER'] } } });
+    const ticketLoad = agentCount > 0 ? (openTickets / agentCount) : openTickets;
+
+    // Tasks overdue
+    const now = new Date();
+    const overdueTasks = await prisma.task.count({ where: { organizationId: req.organizationId, dueDate: { lt: now }, status: { not: 'COMPLETED' } } });
+
+    // Weekly metrics - start of week (UTC)
+    const weekStart = new Date();
+    weekStart.setUTCHours(0,0,0,0);
+    // Move to Monday (ISO week: Monday start)
+    const day = weekStart.getUTCDay();
+    const diffToMonday = (day + 6) % 7; // 0 (Sunday) -> 6, 1 -> 0, etc
+    weekStart.setUTCDate(weekStart.getUTCDate() - diffToMonday);
+
+    const leadsThisWeek = await prisma.lead.count({ where: { organizationId: req.organizationId, createdAt: { gte: weekStart } } });
+    const ticketsResolvedThisWeek = await prisma.ticket.count({ where: { organizationId: req.organizationId, status: 'RESOLVED', updatedAt: { gte: weekStart } } });
+    const tasksCompletedThisWeekRaw = await prisma.task.groupBy({
+      by: ['ownerId'],
+      where: { organizationId: req.organizationId, status: 'COMPLETED', updatedAt: { gte: weekStart } },
+      _count: { ownerId: true }
+    });
+    const tasksCompletedByAgent = {};
+    tasksCompletedThisWeekRaw.forEach(r => { tasksCompletedByAgent[r.ownerId || 'unassigned'] = r._count.ownerId; });
+
+    // Active users in last 7 days (unique activity log userId count)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
+    const activeUsersRaw = await prisma.activityLog.groupBy({ by: ['userId'], where: { organizationId: req.organizationId, createdAt: { gte: sevenDaysAgo }, userId: { not: null } } , _count: { userId: true } });
+    const activeUsersThisWeek = activeUsersRaw.length;
+
     res.json({
       counts: {
         contacts: contactCount,
         leads: leadCount,
         tasks: taskCount,
-        tickets: ticketCount
+        tickets: ticketCount,
+        users: usersCount,
+        accounts: accountCount,
       },
+      organizationsCount,
+      systemHealth: { dbConnected },
+      overdueTasks,
       recentActivities,
+      ticketLoad,
+      activeUsersThisWeek,
       taskStats,
       leadStats,
-      ticketStats
+      ticketStats,
+      ticketPriorityStats,
+      ticketsByAgent,
+      weeklyMetrics: {
+        leadsThisWeek,
+        ticketsResolvedThisWeek,
+        tasksCompletedByAgent
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

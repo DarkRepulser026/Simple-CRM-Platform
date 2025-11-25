@@ -3,7 +3,7 @@ import '../../models/task.dart';
 import '../../services/service_locator.dart';
 import '../../services/tasks_service.dart';
 import '../../navigation/app_router.dart';
-import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import 'task_edit_screen.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
@@ -57,11 +57,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       appBar: AppBar(
         title: Text(_task!.subject),
         actions: [
-          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => AppRouter.navigateTo(context, AppRouter.taskEdit, arguments: TaskEditArgs(taskId: _task!.id)),
-            ),
+          ManagerOrAdminOnly(child: IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => AppRouter.navigateTo(context, AppRouter.taskEdit, arguments: TaskEditArgs(taskId: _task!.id)),
+          )),
         ],
       ),
       body: Padding(
