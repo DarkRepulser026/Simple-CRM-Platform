@@ -10,16 +10,24 @@ import '../screens/contacts/contact_detail_screen.dart';
 import '../screens/contacts/contact_edit_screen.dart';
 import '../screens/accounts/accounts_list_screen.dart';
 import '../screens/accounts/account_create_screen.dart';
+import '../screens/accounts/account_edit_screen.dart';
 import '../screens/accounts/account_detail_screen.dart';
 import '../screens/leads/leads_list_screen.dart';
 import '../screens/leads/lead_create_screen.dart';
 import '../screens/leads/lead_detail_screen.dart';
 import '../screens/leads/lead_edit_screen.dart';
 import '../screens/admin/users_list_screen.dart';
+import '../screens/admin/user_detail_screen.dart';
+import '../screens/admin/user_edit_screen.dart';
 import '../screens/admin/invite_user_screen.dart';
 import '../screens/admin/invitations_screen.dart';
 import '../screens/admin/roles_list_screen.dart';
 import '../screens/admin/activity_logs_screen.dart';
+// unused: '../screens/access_denied_screen.dart';
+import '../screens/access_denied_redirect_screen.dart';
+import 'route_guards.dart';
+import '../services/service_locator.dart';
+import '../services/auth/auth_service.dart';
 import '../screens/interactions/interactions_list_screen.dart';
 import '../screens/tasks/tasks_list_screen.dart';
 import '../screens/tasks/task_create_screen.dart';
@@ -55,6 +63,14 @@ class TicketDetailArgs {
   final String ticketId;
 }
 
+class ActivityLogsArgs {
+  const ActivityLogsArgs({this.entityType, this.entityId, this.userId, this.search});
+  final String? entityType;
+  final String? entityId;
+  final String? userId;
+  final String? search;
+}
+
 /// Central route registry with typed navigation
 class AppRouter {
   static const String login = '/login';
@@ -68,6 +84,7 @@ class AppRouter {
   static const String accounts = '/accounts';
   static const String accountDetail = '/accounts/detail';
   static const String accountCreate = '/accounts/create';
+  static const String accountEdit = '/accounts/edit';
   static const String leads = '/leads';
   static const String tickets = '/tickets';
   static const String contactCreate = '/contact-create';
@@ -80,6 +97,8 @@ class AppRouter {
   static const String ticketDetail = '/ticket-detail';
   static const String ticketEdit = '/ticket-edit';
   static const String adminUsers = '/admin/users';
+  static const String adminUserDetail = '/admin/users/detail';
+  static const String adminUserEdit = '/admin/users/edit';
     static const String adminInvite = '/admin/invite';
     static const String adminInvitations = '/admin/invitations';
   static const String adminRoles = '/admin/roles';
@@ -138,11 +157,12 @@ class AppRouter {
       tasks: (context) => const TasksListScreen(),
       tickets: (context) => const TicketsListScreen(),
       ticketCreate: (context) => const TicketCreateScreen(),
-      adminUsers: (context) => const UsersListScreen(),
-        adminInvite: (context) => const InviteUserScreen(),
-      adminRoles: (context) => const RolesListScreen(),
-      adminInvitations: (context) => const InvitationsScreen(),
-      activityLogs: (context) => const ActivityLogsScreen(),
+      // wrap admin routes with the route guard - these return a WidgetBuilder
+      adminUsers: (context) => managerOrAdminGuarded((c) => const UsersListScreen())(context),
+      adminInvite: (context) => managerOrAdminGuarded((c) => const InviteUserScreen())(context),
+      adminRoles: (context) => adminGuarded((c) => const RolesListScreen())(context),
+      adminInvitations: (context) => managerOrAdminGuarded((c) => const InvitationsScreen())(context),
+      activityLogs: (context) => adminGuarded((c) => const ActivityLogsScreen())(context),
       interactions: (context) => const InteractionsListScreen(),
       contactCreate: (context) => const ContactCreateScreen(),
       // contactDetail: (context) => const ContactDetailScreen(),
@@ -157,12 +177,38 @@ class AppRouter {
   /// Handle onGenerateRoute for dynamic routes with arguments
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case adminUserDetail:
+        final args = settings.arguments as UserDetailArgs?;
+        if (args != null) {
+          if (!locator<AuthService>().isManagerOrAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
+          return MaterialPageRoute(builder: (context) => UserDetailScreen(userId: args.userId));
+        }
+        break;
+      case adminUserEdit:
+        final editArgs = settings.arguments as UserDetailArgs?;
+        if (editArgs != null) {
+          if (!locator<AuthService>().isManagerOrAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
+          return MaterialPageRoute(builder: (context) => UserEditScreen(userId: editArgs.userId));
+        }
+        break;
+      case activityLogs:
+        final args = settings.arguments as ActivityLogsArgs?;
+        if (args != null) {
+          if (!locator<AuthService>().isAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
+          return MaterialPageRoute(builder: (context) => ActivityLogsScreen());
+        }
+        break;
             case accountDetail:
               final args = settings.arguments as AccountDetailArgs?;
               if (args != null) {
                 return MaterialPageRoute(
                   builder: (context) => AccountDetailScreen(accountId: args.accountId),
                 );
+              }
+            case accountEdit:
+              final argsEdit = settings.arguments as AccountDetailArgs?;
+              if (argsEdit != null) {
+                return MaterialPageRoute(builder: (context) => AccountEditScreen(accountId: argsEdit.accountId));
               }
               break;
       case contactDetail:
@@ -227,4 +273,9 @@ class AppRouter {
     }
     return null;
   }
+}
+
+class UserDetailArgs {
+  const UserDetailArgs({required this.userId});
+  final String userId;
 }

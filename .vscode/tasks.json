@@ -18,7 +18,7 @@
       "label": "Dev Frontend",
       "type": "shell",
       "command": "bash",
-      "args": ["-lc", "flutter pub get && flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID"],
+      "args": ["-lc", "flutter pub get && flutter run -d chrome --web-port=3000"],
       "isBackground": true,
       "presentation": {
         "reveal": "always",
@@ -28,7 +28,7 @@
       "problemMatcher": [],
       "windows": {
         "command": "powershell",
-        "args": ["-Command", "flutter pub get ; flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID"]
+        "args": ["-Command", "flutter pub get ; flutter run -d chrome --web-port=3000"]
       }
     },
     {

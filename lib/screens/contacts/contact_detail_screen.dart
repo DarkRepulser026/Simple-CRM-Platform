@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../navigation/app_router.dart';
-import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import 'contact_edit_screen.dart';
 import '../../services/contacts_service.dart';
 import '../../widgets/loading_view.dart';
@@ -63,11 +63,10 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
       appBar: AppBar(
         title: Text('${_contact!.fullName}'),
         actions: [
-          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => AppRouter.navigateTo(context, AppRouter.contactEdit, arguments: ContactEditArgs(contactId: _contact!.id)),
-            ),
+          ManagerOrAdminOnly(child: IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => AppRouter.navigateTo(context, AppRouter.contactEdit, arguments: ContactEditArgs(contactId: _contact!.id)),
+          )),
         ],
       ),
       body: Padding(

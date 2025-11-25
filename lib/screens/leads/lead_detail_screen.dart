@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/lead.dart';
 import '../../services/service_locator.dart';
 import '../../navigation/app_router.dart';
-import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import 'lead_edit_screen.dart';
 import '../../services/leads_service.dart';
 import '../../widgets/loading_view.dart';
@@ -57,11 +57,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       appBar: AppBar(
         title: Text(_lead!.fullName),
         actions: [
-          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => AppRouter.navigateTo(context, AppRouter.leadEdit, arguments: LeadEditArgs(leadId: _lead!.id)),
-            ),
+          ManagerOrAdminOnly(child: IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => AppRouter.navigateTo(context, AppRouter.leadEdit, arguments: LeadEditArgs(leadId: _lead!.id)),
+          )),
         ],
       ),
       body: Padding(

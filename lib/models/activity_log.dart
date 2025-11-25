@@ -63,6 +63,7 @@ enum ActivityType {
 class ActivityLog {
   final String id;
   final ActivityType activityType;
+  final String? action; // raw action string returned by backend (e.g., INVITE_ACCEPTED)
   final String description;
   final String? userId; // User who performed the activity
   final String? userName; // Cached user name for display
@@ -81,6 +82,7 @@ class ActivityLog {
     required this.id,
     required this.activityType,
     required this.description,
+    this.action,
     this.userId,
     this.userName,
     this.entityId,
@@ -115,24 +117,24 @@ class ActivityLog {
 
   /// Factory constructor to create ActivityLog from JSON
   factory ActivityLog.fromJson(Map<String, dynamic> json) {
+    final activityTypeStr = json['activityType'] ?? json['action'] ?? 'Other';
     return ActivityLog(
       id: json['id'] ?? '',
-      activityType: ActivityType.fromString(json['activityType'] ?? 'Other'),
+      activityType: ActivityType.fromString(activityTypeStr),
+      action: (json['action'] as String?) ?? (json['activityType'] as String?),
       description: json['description'] ?? '',
       userId: json['userId'],
-      userName: json['userName'],
+      userName: json['userName'] ?? (json['user'] != null ? (json['user']['name'] ?? json['user']['email']) : null),
       entityId: json['entityId'],
       entityType: json['entityType'],
       entityName: json['entityName'],
       organizationId: json['organizationId'] ?? '',
-      oldValues: json['oldValues'],
-      newValues: json['newValues'],
+      oldValues: json['oldValues'] ?? (json['metadata'] != null && (json['metadata'] as Map<String, dynamic>).containsKey('oldValues') ? (json['metadata'] as Map<String, dynamic>)['oldValues'] : null),
+      newValues: json['newValues'] ?? (json['metadata'] != null && (json['metadata'] as Map<String, dynamic>).containsKey('newValues') ? (json['metadata'] as Map<String, dynamic>)['newValues'] : null),
       ipAddress: json['ipAddress'],
       userAgent: json['userAgent'],
       metadata: json['metadata'],
-      createdAt: DateTime.parse(
-        json['createdAt'] ?? DateTime.now().toIso8601String(),
-      ),
+      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
     );
   }
 
@@ -141,6 +143,7 @@ class ActivityLog {
     return {
       'id': id,
       'activityType': activityType.value,
+      'action': action,
       'description': description,
       'userId': userId,
       'userName': userName,
@@ -161,6 +164,7 @@ class ActivityLog {
   ActivityLog copyWith({
     String? id,
     ActivityType? activityType,
+    String? action,
     String? description,
     String? userId,
     String? userName,
@@ -178,6 +182,7 @@ class ActivityLog {
     return ActivityLog(
       id: id ?? this.id,
       activityType: activityType ?? this.activityType,
+      action: action ?? this.action,
       description: description ?? this.description,
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,

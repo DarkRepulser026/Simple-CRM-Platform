@@ -16,6 +16,10 @@ abstract class AuthService {
   /// Accept an invite token and sign in as the invited user (returns true on success)
   Future<bool> signInWithInviteToken(String token, {String? name});
 
+  /// Accept an invite token while already logged in (associates the current user with invite org)
+  /// Returns true if the invite was accepted successfully, false otherwise.
+  Future<bool> acceptInviteTokenAsCurrentUser(String token, {String? name});
+
   /// Select an organization for the current user
   Future<void> selectOrganization(String organizationId);
 
@@ -51,6 +55,12 @@ abstract class AuthService {
 
   /// Get the selected organization ID
   String? get selectedOrganizationId => selectedOrganization?.id;
+
+  /// Whether the currently selected organization role is Admin
+  bool get isAdmin;
+
+  /// Whether the currently selected organization role is Manager or Admin
+  bool get isManagerOrAdmin;
 
   /// Whether the current auth session is an impersonation
   bool get isImpersonating;

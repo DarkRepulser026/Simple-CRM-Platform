@@ -46,11 +46,19 @@ class ActivityLogService {
     if (userId != null && userId.isNotEmpty) queryParams['userId'] = userId;
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
     final uri = Uri.parse(ApiConfig.activityLogs).replace(queryParameters: queryParams);
-    final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
+    // Use dynamic to accept either a wrapped map response or a raw list
+    final res = await _apiClient.get<dynamic>(uri.toString(), headers: await _getAuthHeaders());
     if (res.isError) return Result.error(res.error);
-    final jsonList = res.value as List<dynamic>;
-    final logs = jsonList.map((l) => ActivityLog.fromJson(l as Map<String, dynamic>)).toList();
-    return Result.success(ActivityLogsResponse(logs: logs));
+    final val = res.value;
+    if (val is List) {
+      // Raw list of logs returned
+      final logs = val.map((l) => ActivityLog.fromJson(l as Map<String, dynamic>)).toList();
+      return Result.success(ActivityLogsResponse(logs: logs));
+    }
+    if (val is Map<String, dynamic>) {
+      return Result.success(ActivityLogsResponse.fromJson(val));
+    }
+    return Result.error(ApiError.parsing('Unexpected response shape for activity logs'));
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {

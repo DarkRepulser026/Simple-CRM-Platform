@@ -6,7 +6,7 @@ import '../../services/tickets_service.dart';
 import '../../navigation/app_router.dart';
 import 'ticket_edit_screen.dart';
 import '../../services/attachments_service.dart';
-import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import 'package:flutter/services.dart';
 import '../../utils/picker_stub.dart' show PickedFile;
 import '../../utils/picker.dart' show pickFile;
@@ -86,11 +86,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         title: Text(_ticket!.subject),
         actions: [
           // Only allow editing for Admin/Manager roles
-          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketEdit, arguments: TicketEditArgs(ticketId: _ticket!.id)),
-            ),
+          ManagerOrAdminOnly(child: IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketEdit, arguments: TicketEditArgs(ticketId: _ticket!.id)),
+          )),
         ],
       ),
       body: Padding(

@@ -1,3 +1,5 @@
+import 'activity_log.dart';
+
 /// Dashboard metrics model representing key business metrics
 class DashboardMetrics {
   final int totalLeads;
@@ -14,8 +16,20 @@ class DashboardMetrics {
   final int resolvedTickets;
   final int overdueTickets;
   final Map<String, int> ticketsByStatus; // Status -> count
+  final Map<String, int> leadsByStatus; // status -> count
   final Map<String, int> ticketsByAgent; // Agent ID -> count
   final Map<String, int> ticketsByPriority; // Priority -> count
+  
+  final int totalUsers;
+  final int totalOrganizations;
+  final int overdueTasks;
+  final int leadsThisWeek;
+  final int ticketsResolvedThisWeek;
+  final int tasksCompletedThisWeek;
+  final List<ActivityLog> recentActivities;
+  final String systemHealth;
+  final double ticketLoad;
+  final int activeUsersThisWeek;
 
   // Customer satisfaction metrics
   final double averageCsat; // Customer Satisfaction Score (1-5 scale)
@@ -43,8 +57,19 @@ class DashboardMetrics {
     required this.resolvedTickets,
     required this.overdueTickets,
     required this.ticketsByStatus,
+    required this.leadsByStatus,
     required this.ticketsByAgent,
     required this.ticketsByPriority,
+    required this.totalUsers,
+    required this.totalOrganizations,
+    required this.overdueTasks,
+    required this.leadsThisWeek,
+    required this.ticketsResolvedThisWeek,
+    required this.tasksCompletedThisWeek,
+    required this.recentActivities,
+    required this.systemHealth,
+    required this.ticketLoad,
+    required this.activeUsersThisWeek,
     required this.averageCsat,
     required this.averageNps,
     required this.totalSatisfactionResponses,
@@ -72,10 +97,12 @@ class DashboardMetrics {
     final totalTickets = (counts['tickets'] is int)
       ? counts['tickets'] as int
       : ticketsByStatus.values.fold<int>(0, (a, b) => a + b);
-    final openTickets = ticketsByStatus['Open'] ?? ticketsByStatus['open'] ?? 0;
-    final pendingTickets = ticketsByStatus['Pending'] ?? ticketsByStatus['pending'] ?? 0;
-    final resolvedTickets = ticketsByStatus['Resolved'] ?? ticketsByStatus['resolved'] ?? 0;
-    final overdueTickets = ticketsByStatus['Overdue'] ?? ticketsByStatus['overdue'] ?? 0;
+    final openTickets = ticketsByStatus['OPEN'] ?? ticketsByStatus['Open'] ?? ticketsByStatus['open'] ?? 0;
+    final pendingTickets = ticketsByStatus['PENDING'] ?? ticketsByStatus['Pending'] ?? ticketsByStatus['pending'] ?? 0;
+    final resolvedTickets = ticketsByStatus['RESOLVED'] ?? ticketsByStatus['Resolved'] ?? ticketsByStatus['resolved'] ?? 0;
+    final overdueTickets = ticketsByStatus['OVERDUE'] ?? ticketsByStatus['Overdue'] ?? ticketsByStatus['overdue'] ?? 0;
+
+    final recentActivitiesList = (json['recentActivities'] as List<dynamic>?)?.map((e) => ActivityLog.fromJson(e as Map<String, dynamic>)).toList() ?? [];
 
     return DashboardMetrics(
       totalLeads: (counts['leads'] as int?) ?? 0,
@@ -90,8 +117,19 @@ class DashboardMetrics {
       resolvedTickets: resolvedTickets,
       overdueTickets: overdueTickets,
       ticketsByStatus: ticketsByStatus,
-      ticketsByAgent: {},
-      ticketsByPriority: {},
+      leadsByStatus: (json['leadStats'] as List<dynamic>?)?.fold<Map<String, int>>({}, (acc, p) { try { acc[(p['status'] ?? 'Unknown') as String] = (p['_count'] != null && p['_count']['status'] != null) ? (p['_count']['status'] as int) : (p['count'] as int? ?? 0); } catch(_) {} return acc; }) ?? {},
+      ticketsByAgent: (json['ticketsByAgent'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, (v as int? ?? 0))) ?? {},
+      ticketsByPriority: (json['ticketPriorityStats'] as List<dynamic>?)?.fold<Map<String, int>>({}, (acc, p) { try { acc[(p['priority'] ?? 'Unknown') as String] = (p['_count'] != null && p['_count']['priority'] != null) ? (p['_count']['priority'] as int) : (p['count'] as int? ?? 0); } catch(_){} return acc; }) ?? {},
+      totalUsers: (json['counts'] != null ? (json['counts']['users'] as int?) : null) ?? 0,
+      overdueTasks: (json['overdueTasks'] as int?) ?? 0,
+      leadsThisWeek: (json['weeklyMetrics'] != null ? (json['weeklyMetrics']['leadsThisWeek'] as int?) : null) ?? 0,
+      ticketsResolvedThisWeek: (json['weeklyMetrics'] != null ? (json['weeklyMetrics']['ticketsResolvedThisWeek'] as int?) : null) ?? 0,
+      tasksCompletedThisWeek: (json['weeklyMetrics'] != null ? ((json['weeklyMetrics']['tasksCompletedByAgent'] as Map<String, dynamic>?)?.values.fold<int>(0, (a,b) => a + (b as int? ?? 0)) ) : 0) ?? 0,
+      recentActivities: recentActivitiesList,
+      systemHealth: (json['systemHealth'] != null ? (json['systemHealth']['dbConnected'] == true ? 'ok' : 'degraded') : 'unknown'),
+      ticketLoad: (json['ticketLoad'] is num) ? (json['ticketLoad'] as num).toDouble() : 0.0,
+      activeUsersThisWeek: (json['activeUsersThisWeek'] as int?) ?? 0,
+      totalOrganizations: (json['organizationsCount'] as int?) ?? 0,
       averageCsat: 0.0,
       averageNps: 0.0,
       totalSatisfactionResponses: 0,
@@ -119,6 +157,10 @@ class DashboardMetrics {
       'ticketsByStatus': ticketsByStatus,
       'ticketsByAgent': ticketsByAgent,
       'ticketsByPriority': ticketsByPriority,
+      'organizationsCount': totalOrganizations,
+      'systemHealth': { 'dbConnected': systemHealth == 'ok' },
+      'ticketLoad': ticketLoad,
+      'activeUsersThisWeek': activeUsersThisWeek,
       'averageCsat': averageCsat,
       'averageNps': averageNps,
       'totalSatisfactionResponses': totalSatisfactionResponses,
@@ -136,6 +178,7 @@ class DashboardMetrics {
     return other is DashboardMetrics &&
         other.totalLeads == totalLeads &&
         other.totalOpportunities == totalOpportunities &&
+        
         other.totalAccounts == totalAccounts &&
         other.totalContacts == totalContacts &&
         other.pendingTasks == pendingTasks &&
