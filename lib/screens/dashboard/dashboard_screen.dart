@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:fl_chart/fl_chart.dart';
+
 import '../../models/dashboard_metrics.dart';
 import '../../services/auth/auth_service.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/service_locator.dart';
 import '../../services/dashboard_service.dart';
 import '../../widgets/error_view.dart';
@@ -52,25 +54,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
 
-      // If the user is not authenticated, navigate to login
       if (!_authService.isLoggedIn) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to continue')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please sign in to continue')),
+          );
           AppRouter.replaceWith(context, AppRouter.login);
         }
         return;
       }
 
-      // If the issue is that an organization has not been selected, navigate to company selection
       if (!_authService.hasSelectedOrganization) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an organization to view dashboard')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Please select an organization to view dashboard'),
+            ),
+          );
           AppRouter.navigateTo(context, AppRouter.companySelection);
         }
         return;
       }
 
-      // Otherwise throw to surface the error message
       throw Exception(res.error.message);
     } catch (e) {
       setState(() {
@@ -83,9 +89,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 800;
+    final isSmallScreen = screenWidth < 900;
+    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFF020617),
       floatingActionButton: kDebugMode
           ? FloatingActionButton(
               mini: true,
@@ -96,25 +104,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   context: context,
                   builder: (_) => AlertDialog(
                     title: const Text('Debug Info'),
-                    content: Text('Logged in: ${_authService.isLoggedIn}\nImpersonating: ${_authService.isImpersonating}\nSelected organization: ${_authService.selectedOrganizationId ?? 'none'}\nJWT present: ${_authService.jwtToken != null}'),
+                    content: Text(
+                      'Logged in: ${_authService.isLoggedIn}\n'
+                      'Impersonating: ${_authService.isImpersonating}\n'
+                      'Selected organization: ${_authService.selectedOrganizationId ?? 'none'}\n'
+                      'JWT present: ${_authService.jwtToken != null}',
+                    ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
                     ],
                   ),
                 );
               },
             )
           : null,
-      body: Row(
-        children: [
-          _buildSidebar(showLogout: !isSmallScreen, showImpersonation: !isSmallScreen),
-          Expanded(
-            child: _buildContent(isSmallScreen),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF020617)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withOpacity(0.98),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.12),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 36,
+                    offset: const Offset(0, 22),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _buildSidebar(
+                    showLogout: !isSmallScreen,
+                    showImpersonation: !isSmallScreen,
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: _buildContent(isSmallScreen)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
+
+  // ---------- CONTENT ----------
 
   Widget _buildContent(bool isSmallScreen) {
     if (_isLoading) {
@@ -129,24 +179,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (_metrics == null) {
-      return const Center(
-        child: Text('No data available'),
-      );
+      return const Center(child: Text('No data available'));
     }
 
     return RefreshIndicator(
       onRefresh: _loadDashboard,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Calculate responsive padding based on screen width
           final screenWidth = constraints.maxWidth;
-          final horizontalPadding = screenWidth > 1200
-              ? 64.0 // Large screens
-              : screenWidth > 800
-                  ? 48.0 // Medium screens
-                  : 24.0; // Small screens
+          final horizontalPadding = screenWidth > 1400
+              ? 56.0
+              : screenWidth > 1000
+                  ? 40.0
+                  : 24.0;
+          final theme = Theme.of(context);
 
           return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: horizontalPadding,
@@ -155,80 +204,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome header and actions
+                  // HEADER
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back!',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (kDebugMode) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Debug: Auth=${_authService.isLoggedIn ? 'yes' : 'no'}  Org=${_authService.selectedOrganizationId ?? 'none'}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ],
-                            Text(
-                              'Here\'s your business overview',
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Actions moved into the header for small screens when the AppBar is removed
-                      if (isSmallScreen)
-                        Row(
-                          children: [
-                            if (_authService.isImpersonating)
-                              IconButton(
-                                onPressed: () async {
-                                  final ok = await _authService.stopImpersonation();
-                                  if (mounted && ok) {
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stopped impersonation')));
-                                    await _loadDashboard();
-                                  }
-                                },
-                                icon: const Icon(Icons.person_off),
-                                tooltip: 'Stop impersonation',
-                              ),
-                            IconButton(
-                              onPressed: () async {
-                                await _authService.logout();
-                                if (mounted) {
-                                  AppRouter.replaceWith(context, AppRouter.login);
-                                }
-                              },
-                              icon: const Icon(Icons.logout),
-                            ),
-                          ],
-                        ),
+                      Expanded(child: _buildHeaderText(theme)),
+                      const SizedBox(width: 16),
+                      if (isSmallScreen) _buildSmallHeaderActions(),
                     ],
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
 
-                  // Metrics cards
-                  _buildMetricsGrid(),
+                  // HIGHLIGHT STRIP
+                  _buildHighlightStrip(theme),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 28),
 
-                  // Quick actions
+                  // ROW 1: TOP KPI
+                  _buildTopOverviewRow(),
+
+                  const SizedBox(height: 28),
+
+                  // ROW 2: 2 CHART PANELS
+                  _buildMiddleChartsRow(),
+
+                  const SizedBox(height: 32),
+
+                  // QUICK ACTIONS
                   _buildQuickActions(),
                 ],
               ),
@@ -239,180 +242,257 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMetricsGrid() {
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Key Metrics',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Business Overview Row
-            _buildMetricRow(
-              'Business Overview',
-              [
-                _CompactMetricCard(
-                  title: 'Contacts',
-                  value: _metrics!.totalContacts.toString(),
-                  icon: Icons.people,
-                  color: Colors.blue,
-                ),
-                _CompactMetricCard(
-                  title: 'Leads',
-                  value: _metrics!.totalLeads.toString(),
-                  icon: Icons.trending_up,
-                  color: Colors.green,
-                ),
-                _CompactMetricCard(
-                  title: 'Opportunities',
-                  value: _metrics!.totalOpportunities.toString(),
-                  icon: Icons.business_center,
-                  color: Colors.orange,
-                ),
-                _CompactMetricCard(
-                  title: 'Revenue',
-                  value: '\$${_metrics!.opportunityRevenue.toStringAsFixed(0)}',
-                  icon: Icons.attach_money,
-                  color: Colors.purple,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            // Task Management Row
-            _buildMetricRow(
-              'Task Management',
-              [
-                _CompactMetricCard(
-                  title: 'Pending Tasks',
-                  value: _metrics!.pendingTasks.toString(),
-                  icon: Icons.pending_actions,
-                  color: Colors.red,
-                ),
-                _CompactMetricCard(
-                  title: 'Accounts',
-                  value: _metrics!.totalAccounts.toString(),
-                  icon: Icons.account_balance,
-                  color: Colors.teal,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            // Customer Service Row
-            _buildMetricRow(
-              'Customer Service',
-              [
-                _CompactMetricCard(
-                  title: 'CSAT Score',
-                  value: _metrics!.averageCsat.toStringAsFixed(1),
-                  icon: Icons.star_rate,
-                  color: Colors.blueGrey,
-                ),
-                _CompactMetricCard(
-                  title: 'NPS Score',
-                  value: _metrics!.averageNps.toStringAsFixed(1),
-                  icon: Icons.thumb_up,
-                  color: Colors.lightGreen,
-                ),
-                _CompactMetricCard(
-                  title: 'SLA Compliance',
-                  value: '${_metrics!.slaComplianceRate.toStringAsFixed(1)}%',
-                  icon: Icons.access_time,
-                  color: Colors.redAccent,
-                ),
-                _CompactMetricCard(
-                  title: 'Avg Response',
-                  value: '${_metrics!.averageResponseTime.toStringAsFixed(1)}h',
-                  icon: Icons.timer,
-                  color: Colors.cyan,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            // Performance Row
-            _buildMetricRow(
-              'Performance',
-              [
-                _CompactMetricCard(
-                  title: 'First Response',
-                  value: '${_metrics!.averageFirstResponseTime.toStringAsFixed(1)}h',
-                  icon: Icons.schedule,
-                  color: Colors.indigo,
-                ),
-                _CompactMetricCard(
-                  title: 'Resolution Time',
-                  value: '${_metrics!.averageResolutionTime.toStringAsFixed(1)}h',
-                  icon: Icons.done_all,
-                  color: Colors.deepOrange,
-                ),
-                _CompactMetricCard(
-                  title: 'Total Tickets',
-                  value: _metrics!.totalTickets.toString(),
-                  icon: Icons.confirmation_number,
-                  color: Colors.brown,
-                ),
-                _CompactMetricCard(
-                  title: 'Active Tickets',
-                  value: _metrics!.openTickets.toString(),
-                  icon: Icons.pending,
-                  color: Colors.pink,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricRow(String sectionTitle, List<Widget> cards) {
+  Widget _buildHeaderText(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          sectionTitle,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+        Row(
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: const Color(0xFFCBD5F5),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF22C55E),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Live overview',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: const Color(0xFF4F46E5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (_authService.hasSelectedOrganization)
+              Text(
+                'Org: ${_authService.selectedOrganizationId}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: cards,
+        Text(
+          'Welcome back 👋',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Here’s what’s happening across your customers, pipeline and support today.',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (kDebugMode) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Debug · Auth=${_authService.isLoggedIn ? 'yes' : 'no'} · '
+            'Org=${_authService.selectedOrganizationId ?? 'none'}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color:
+                  theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSmallHeaderActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_authService.isImpersonating)
+          IconButton(
+            onPressed: () async {
+              final ok = await _authService.stopImpersonation();
+              if (mounted && ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Stopped impersonation')),
+                );
+                await _loadDashboard();
+              }
+            },
+            icon: const Icon(Icons.person_off),
+            tooltip: 'Stop impersonation',
+          ),
+        IconButton(
+          onPressed: () async {
+            await _authService.logout();
+            if (mounted) {
+              AppRouter.replaceWith(context, AppRouter.login);
+            }
+          },
+          icon: const Icon(Icons.logout),
         ),
       ],
     );
   }
 
+  Widget _buildHighlightStrip(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.bolt,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'You have ${_metrics!.pendingTasks} pending tasks and '
+              '${_metrics!.openTickets} active tickets to follow up.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------- LAYOUT ROWS ----------
+
+  Widget _buildTopOverviewRow() {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      children: [
+        _CompactMetricCard(
+          title: 'Revenue',
+          value: '\$${_metrics!.opportunityRevenue.toStringAsFixed(0)}',
+          icon: Icons.attach_money,
+          color: const Color(0xFFA855F7),
+        ),
+        _CompactMetricCard(
+          title: 'Contacts',
+          value: _metrics!.totalContacts.toString(),
+          icon: Icons.people,
+          color: const Color(0xFF2563EB),
+        ),
+        _CompactMetricCard(
+          title: 'Leads',
+          value: _metrics!.totalLeads.toString(),
+          icon: Icons.trending_up,
+          color: const Color(0xFF22C55E),
+        ),
+        _CompactMetricCard(
+          title: 'Opportunities',
+          value: _metrics!.totalOpportunities.toString(),
+          icon: Icons.business_center,
+          color: const Color(0xFFF97316),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiddleChartsRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 900;
+
+        if (isNarrow) {
+          return Column(
+            children: [
+              _DashboardPanel(
+                title: 'Support health',
+                subtitle: 'Tickets status & SLA',
+                child: _SupportHealthChart(metrics: _metrics!),
+              ),
+              const SizedBox(height: 16),
+              _DashboardPanel(
+                title: 'Customer satisfaction',
+                subtitle: 'CSAT · NPS · SLA',
+                child: _SatisfactionChart(metrics: _metrics!),
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _DashboardPanel(
+                title: 'Support health',
+                subtitle: 'Tickets status & SLA',
+                child: _SupportHealthChart(metrics: _metrics!),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _DashboardPanel(
+                title: 'Customer satisfaction',
+                subtitle: 'CSAT · NPS · SLA',
+                child: _SatisfactionChart(metrics: _metrics!),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ---------- QUICK ACTIONS ----------
+
   Widget _buildQuickActions() {
+    final theme = Theme.of(context);
+
     return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Quick Actions',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+            'Quick actions',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          Text(
+            'Jump straight into the areas you work with the most.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -421,29 +501,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Create Ticket',
                 subtitle: 'Open a new customer support ticket',
                 icon: Icons.add_circle_outline,
-                color: Theme.of(context).colorScheme.primary,
-                onTap: () => AppRouter.navigateTo(context, AppRouter.ticketCreate),
+                color: theme.colorScheme.primary,
+                onTap: () =>
+                    AppRouter.navigateTo(context, AppRouter.ticketCreate),
               ),
               _QuickActionCard(
                 title: 'View Tickets',
                 subtitle: 'Browse and manage all tickets',
                 icon: Icons.list_alt,
-                color: Theme.of(context).colorScheme.secondary,
-                onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+                color: theme.colorScheme.secondary,
+                onTap: () =>
+                    AppRouter.navigateTo(context, AppRouter.tickets),
               ),
-                _QuickActionCard(
+              _QuickActionCard(
                 title: 'Customer Interactions',
                 subtitle: 'Log and track customer interactions',
                 icon: Icons.people_outline,
-                color: Theme.of(context).colorScheme.tertiary,
-                onTap: () => AppRouter.navigateTo(context, AppRouter.interactions),
+                color: theme.colorScheme.tertiary,
+                onTap: () =>
+                    AppRouter.navigateTo(context, AppRouter.interactions),
               ),
               _QuickActionCard(
                 title: 'View Reports',
                 subtitle: 'Generate performance reports',
                 icon: Icons.analytics_outlined,
-                color: Theme.of(context).colorScheme.error,
-                onTap: () => AppRouter.navigateTo(context, AppRouter.dashboard), // TODO: Create reports screen
+                color: theme.colorScheme.error,
+                onTap: () =>
+                    AppRouter.navigateTo(context, AppRouter.dashboard),
               ),
             ],
           ),
@@ -452,46 +536,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSidebar({required bool showLogout, required bool showImpersonation}) {
+  // ---------- SIDEBAR ----------
+
+  Widget _buildSidebar({
+    required bool showLogout,
+    required bool showImpersonation,
+  }) {
+    final theme = Theme.of(context);
+
     return Container(
       width: 250,
-      color: Theme.of(context).colorScheme.surface,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withOpacity(0.96),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          bottomLeft: Radius.circular(24),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo and app name
+          // Logo + app name
           Row(
             children: [
-              Icon(
-                Icons.dashboard,
-                color: Theme.of(context).colorScheme.primary,
-                size: 28,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Dashboard',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4F46E5), Color(0xFF22C55E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
+                child: const Icon(
+                  Icons.dashboard_customize,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CRM Project',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    'Control center',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 32),
-          // Navigation items
+
+          const SizedBox(height: 24),
+
+          Text(
+            'MAIN',
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w600,
+              color:
+                  theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 8),
+
           _SidebarItem(
             icon: Icons.dashboard_outlined,
             label: 'Dashboard',
             isSelected: true,
-            onTap: () {
-              // Already on Dashboard
-            },
+            onTap: () {},
           ),
           _SidebarItem(
             icon: Icons.people_outline,
             label: 'Contacts',
-            onTap: () => AppRouter.navigateTo(context, AppRouter.contacts),
+            onTap: () =>
+                AppRouter.navigateTo(context, AppRouter.contacts),
           ),
           _SidebarItem(
             icon: Icons.task_outlined,
@@ -501,57 +631,152 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _SidebarItem(
             icon: Icons.support_agent_outlined,
             label: 'Tickets',
-            onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+            onTap: () =>
+                AppRouter.navigateTo(context, AppRouter.tickets),
           ),
-          const Spacer(),
-          // Impersonation and logout buttons (shown on larger screens to avoid duplicate top bar controls)
-          if (showImpersonation)
-            IconButton(
-              onPressed: () async {
-                final ok = await _authService.stopImpersonation();
-                if (mounted && ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stopped impersonation')));
-                  await _loadDashboard();
-                }
-              },
-              icon: const Icon(Icons.person_off),
-              tooltip: 'Stop impersonation',
+
+          const SizedBox(height: 24),
+
+          Text(
+            'MANAGEMENT',
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w600,
+              color:
+                  theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
             ),
+          ),
+          const SizedBox(height: 8),
+
+          _SidebarItem(
+            icon: Icons.business,
+            label: 'Organizations',
+            onTap: () =>
+                AppRouter.navigateTo(context, AppRouter.organizations),
+          ),
+          _SidebarItem(
+            icon: Icons.account_balance,
+            label: 'Accounts',
+            onTap: () =>
+                AppRouter.navigateTo(context, AppRouter.accounts),
+          ),
+          _SidebarItem(
+            icon: Icons.history,
+            label: 'Activity Logs',
+            onTap: () =>
+                AppRouter.navigateTo(context, AppRouter.activityLogs),
+          ),
+
+          const Spacer(),
+
+          if (showImpersonation && _authService.isImpersonating)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.secondary,
+                  side: BorderSide(
+                    color: theme.colorScheme.secondary.withOpacity(0.5),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                onPressed: () async {
+                  final ok = await _authService.stopImpersonation();
+                  if (mounted && ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Stopped impersonation')),
+                    );
+                    await _loadDashboard();
+                  }
+                },
+                icon: const Icon(Icons.person_off, size: 16),
+                label: const Text('Stop impersonating'),
+              ),
+            ),
+
           if (showLogout)
-            TextButton.icon(
-              onPressed: () async {
-                await _authService.logout();
-                if (mounted) {
-                  AppRouter.replaceWith(context, AppRouter.login);
-                }
-              },
-              icon: const Icon(Icons.logout, size: 16),
-              label: const Text('Logout'),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await _authService.logout();
+                  if (mounted) {
+                    AppRouter.replaceWith(context, AppRouter.login);
+                  }
+                },
+                icon: const Icon(Icons.logout, size: 16),
+                label: const Text('Logout'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------- SMALL WIDGETS ----------
+
+class _DashboardPanel extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget child;
+
+  const _DashboardPanel({
+    required this.title,
+    this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withOpacity(0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          ListTile(
-            leading: Icon(Icons.business, color: Theme.of(context).colorScheme.primary),
-            title: const Text('Organizations'),
-            onTap: () => AppRouter.navigateTo(context, AppRouter.organizations),
-          ),
-          ListTile(
-            leading: Icon(Icons.account_balance, color: Theme.of(context).colorScheme.primary),
-            title: const Text('Accounts'),
-            onTap: () => AppRouter.navigateTo(context, AppRouter.accounts),
-          ),
-          ListTile(
-            leading: Icon(Icons.history, color: Theme.of(context).colorScheme.primary),
-            title: const Text('Activity Logs'),
-            onTap: () => AppRouter.navigateTo(context, AppRouter.activityLogs),
-          ),
+          child,
         ],
       ),
     );
@@ -574,58 +799,68 @@ class _CompactMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
-      width: 200,
-      padding: const EdgeInsets.all(20),
+      width: 220,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surface.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: theme.colorScheme.outline.withOpacity(0.18),
         ),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.shadow.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: theme.colorScheme.shadow.withOpacity(0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: color,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: color,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -647,72 +882,86 @@ class _QuickActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color color;
+  final Color color; // màu accent
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        width: 240,
-        padding: const EdgeInsets.all(20),
+        width: 260,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          color: theme.colorScheme.surface.withOpacity(0.98),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+            color: const Color(0xFFE5E7EB),
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.shadow.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
           children: [
+            // Icon trong ô bo góc
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 icon,
-                size: 24,
+                size: 22,
                 color: color,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
+
+            // Text
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(width: 8),
+
+            // Mũi tên bên phải
             Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              Icons.chevron_right,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
             ),
           ],
         ),
@@ -720,7 +969,6 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
 /// Sidebar item widget for web dashboard
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
@@ -737,37 +985,332 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final bgColor = isSelected
+        ? theme.colorScheme.primary.withOpacity(0.08)
+        : Colors.transparent;
+
+    final iconColor = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    final textColor = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurface;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding:
+            const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
+            Icon(icon, color: iconColor, size: 20),
+            const SizedBox(width: 10),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurface,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: textColor,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------- CHART WIDGETS ----------
+
+class _SupportHealthChart extends StatelessWidget {
+  final DashboardMetrics metrics;
+
+  const _SupportHealthChart({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final total = metrics.totalTickets;
+    final open = metrics.openTickets;
+    final closed = (total - open).clamp(0, total);
+    final hasTickets = total > 0;
+
+    return Row(
+      children: [
+        SizedBox(
+          height: 160,
+          width: 160,
+          child: hasTickets
+              ? PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 40,
+                    borderData: FlBorderData(show: false),
+                    sections: [
+                      PieChartSectionData(
+                        value: open.toDouble(),
+                        color: const Color(0xFFEF4444),
+                        radius: 26,
+                        title: '',
+                      ),
+                      PieChartSectionData(
+                        value: closed.toDouble(),
+                        color: const Color(0xFF22C55E),
+                        radius: 26,
+                        title: '',
+                      ),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    'No tickets',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _legendDot(
+                'Open tickets',
+                '${open}/${total}',
+                const Color(0xFFEF4444),
+                theme,
+              ),
+              const SizedBox(height: 4),
+              _legendDot(
+                'Closed tickets',
+                '$closed/$total',
+                const Color(0xFF22C55E),
+                theme,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'SLA compliance: ${metrics.slaComplianceRate.toStringAsFixed(1)}%',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Avg response time: ${metrics.averageResponseTime.toStringAsFixed(1)}h',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                'Avg resolution time: ${metrics.averageResolutionTime.toStringAsFixed(1)}h',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _legendDot(
+    String label,
+    String value,
+    Color color,
+    ThemeData theme,
+  ) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SatisfactionChart extends StatelessWidget {
+  final DashboardMetrics metrics;
+
+  const _SatisfactionChart({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final scores = [
+      metrics.averageCsat,
+      metrics.averageNps,
+      metrics.slaComplianceRate,
+    ];
+
+    final maxScore = (scores.reduce((a, b) => a > b ? a : b) * 1.1)
+        .clamp(10, 100)
+        .toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 180,
+          child: BarChart(
+            BarChartData(
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxScore / 4,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color:
+                      theme.colorScheme.outline.withOpacity(0.15),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: maxScore / 4,
+                    getTitlesWidget: (value, _) {
+                      return Text(
+                        value.toStringAsFixed(0),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color:
+                              theme.colorScheme.onSurfaceVariant,
+                          fontSize: 10,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, _) {
+                      switch (value.toInt()) {
+                        case 0:
+                          return const Text('CSAT', style: TextStyle(fontSize: 11));
+                        case 1:
+                          return const Text('NPS', style: TextStyle(fontSize: 11));
+                        case 2:
+                          return const Text('SLA', style: TextStyle(fontSize: 11));
+                        default:
+                          return const SizedBox.shrink();
+                      }
+                    },
+                  ),
+                ),
+              ),
+              barGroups: [
+                _barGroup(0, metrics.averageCsat, const Color(0xFF4F46E5)),
+                _barGroup(1, metrics.averageNps, const Color(0xFF22C55E)),
+                _barGroup(
+                    2, metrics.slaComplianceRate, const Color(0xFFF97316)),
+              ],
+              maxY: maxScore,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _ScorePill('CSAT', metrics.averageCsat.toStringAsFixed(1)),
+            _ScorePill('NPS', metrics.averageNps.toStringAsFixed(1)),
+            _ScorePill(
+                'SLA', '${metrics.slaComplianceRate.toStringAsFixed(0)}%'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  BarChartGroupData _barGroup(int x, double value, Color color) {
+    return BarChartGroupData(
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: value,
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+          width: 20,
+        ),
+      ],
+    );
+  }
+}
+
+class _ScorePill extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ScorePill(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: const Color(0xFFF3F4F6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF111827),
+            ),
+          ),
+        ],
       ),
     );
   }
