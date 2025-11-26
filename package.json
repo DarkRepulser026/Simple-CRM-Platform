@@ -11,7 +11,7 @@
     "backend-grant-admin": "npm --prefix backend run grant-admin",
     "backend-seed-demo": "npm --prefix backend run seed-demo",
     "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "flutter pub get && flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID",
-    "dev": "concurrently --kill-others-on-fail --names \"backend,frontend\" \"npm --prefix backend run dev\" \"flutter pub get && flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID\""
+    "dev:frontend": "flutter pub get && flutter run -d chrome --web-port=3000",
+    "dev": "concurrently --kill-others-on-fail --names \"backend,frontend\" \"npm --prefix backend run dev\" \"npm run dev:frontend\""
   }
 }

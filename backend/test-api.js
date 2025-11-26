@@ -76,6 +76,92 @@ async function testDashboard(token, orgId) {
   }
 }
 
+// Test accounts flow
+async function testAccounts(token, orgId) {
+  try {
+    console.log('Testing accounts flow...');
+    // Create account
+    const createRes = await fetch(`${BASE_URL}/accounts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      },
+      body: JSON.stringify({ name: 'ACME Corp', type: 'Customer' })
+    });
+    const created = await createRes.json();
+    console.log('Created account:', created);
+    const accId = created.id;
+
+    // Get account
+    const getRes = await fetch(`${BASE_URL}/accounts/${accId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      }
+    });
+    const loaded = await getRes.json();
+    console.log('Loaded account:', loaded);
+
+    // Update account
+    const updateRes = await fetch(`${BASE_URL}/accounts/${accId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      },
+      body: JSON.stringify({ name: 'ACME Corporation', type: 'Customer' })
+    });
+    const updated = await updateRes.json();
+    console.log('Updated account:', updated);
+
+    // List accounts
+    const listRes = await fetch(`${BASE_URL}/accounts`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      }
+    });
+    const list = await listRes.json();
+    console.log('Accounts list:', list);
+
+    // Delete account
+    const delRes = await fetch(`${BASE_URL}/accounts/${accId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      }
+    });
+    const deleted = await delRes.json();
+    console.log('Delete response:', deleted);
+
+    // List activity logs
+    const logsRes = await fetch(`${BASE_URL}/activity_logs`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      }
+    });
+    const logs = await logsRes.json();
+    console.log('Activity logs:', logs);
+    // Check logs for old/new values
+    const entityLogsRes = await fetch(`${BASE_URL}/activity_logs?entityId=${accId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId
+      }
+    });
+    const entityLogs = await entityLogsRes.json();
+    console.log('Entity logs for account:', entityLogs);
+  } catch (err) {
+    console.error('Accounts flow failed:', err);
+  }
+}
+
 // Run tests
 async function runTests() {
   const token = await testAuth();
@@ -85,6 +171,7 @@ async function runTests() {
   if (!orgId) return;
 
   await testDashboard(token, orgId);
+  await testAccounts(token, orgId);
 
   console.log('Tests completed!');
 }

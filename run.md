@@ -5,7 +5,7 @@
 - Flutter SDK (3.24.0+ recommended)
 - Dart SDK (comes with Flutter)
 - PostgreSQL instance (local or Docker)
-- For Google OAuth: a valid Google OAuth `Client ID` and `Client Secret` configured in the backend `.env` and the authorized redirect URI: `http://localhost:3000/auth/google/callback`
+- For Google OAuth: a valid Google OAuth `Client ID` and `Client Secret` configured in the backend `.env` and the authorized redirect URI: `http://localhost:3001/auth/google/callback` (backend server callback)
 
 ---
 
@@ -43,7 +43,7 @@ npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
 # start the server in dev mode (nodemon)
-npm run dev
+npm run dev:backend
 ```
 
 Windows PowerShell:
@@ -55,7 +55,7 @@ $env:PORT = "3001"
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
-npm run dev
+npm run dev:backend
 ```
 
 macOS / Linux (bash / zsh):
@@ -67,7 +67,7 @@ export PORT=3001
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
-npm run dev
+npm run dev:backend
 ```
 
 Optional: start the server without nodemon (production-like):
@@ -93,13 +93,13 @@ From the root of the repository (one directory up from `backend`), run:
 ```bash
 flutter pub get
 # Windows cmd.exe
-flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+flutter run -d chrome --web-port=3000
 
 # Windows PowerShell
-flutter run -d chrome --web-port=3000 --dart-define:API_BASE_URL="http://localhost:3001" --dart-define:GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"
+flutter run -d chrome --web-port=3000
 
 # macOS / Linux
-flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+flutter run -d chrome --web-port=3000
 ```
 
 Notes:
@@ -118,7 +118,7 @@ Terminal 1: Backend
 cd backend
 npm install
 set PORT=3001  # or export PORT=3001 for POSIX shells
-npm run dev
+npm run dev:backend
 ```
 
 Terminal 2: Frontend
@@ -126,7 +126,7 @@ Terminal 2: Frontend
 ```bash
 # from repo root
 flutter pub get
-flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+flutter run -d chrome --web-port=3000
 ```
 
 ---
@@ -139,21 +139,6 @@ flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhos
 - For a clean local dev reset, use the `backend` scripts to re-run migrations and the `seed-demo` script to seed sample data.
 
 ---
-
-## 6) Combined dev script
-
-The repository includes a `dev` script at the root that runs both backend and frontend concurrently using `concurrently`. To use it:
-
-```bash
-# install root-level dependencies (only necessary once or when updated)
-npm install
-
-# run both backend and frontend concurrently from the repo root
-npm run dev
-```
-
-The `dev` script is equivalent to running `npm --prefix backend run dev` and `flutter pub get && flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001` concurrently.
-Note: the `dev` script includes `--dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID` as a compile-time define. You should replace `YOUR_GOOGLE_CLIENT_ID` with your actual Google Client ID or update the `dev:frontend` and `dev` scripts in `package.json` accordingly.
 
 ### Run in separate terminals (manual)
 
@@ -201,7 +186,7 @@ npm run dev
 # In another terminal
 cd ..
 flutter pub get
-flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:3001 --dart-define=GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+flutter run -d chrome --web-port=3000
 ```
 
 ---

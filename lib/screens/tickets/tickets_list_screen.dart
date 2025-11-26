@@ -3,6 +3,7 @@ import '../../widgets/paginated_list_view.dart';
 import '../../models/ticket.dart';
 import '../../navigation/app_router.dart';
 import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import '../../widgets/error_view.dart';
 import '../../services/tickets_service.dart';
 import '../../services/service_locator.dart';
@@ -44,12 +45,11 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
       appBar: AppBar(
         title: const Text('Tickets'),
         actions: [
-          if (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager')
-            IconButton(
-              onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketCreate),
-              icon: const Icon(Icons.add),
-              tooltip: 'Create Ticket',
-            ),
+          ManagerOrAdminOnly(child: IconButton(
+            onPressed: () => AppRouter.navigateTo(context, AppRouter.ticketCreate),
+            icon: const Icon(Icons.add),
+            tooltip: 'Create Ticket',
+          )),
           IconButton(
             onPressed: () {
               // TODO: Implement search

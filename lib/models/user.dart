@@ -5,6 +5,7 @@ class User {
   final String? profileImage;
   final String? googleId;
   final bool isActive;
+  final String? role;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -15,6 +16,7 @@ class User {
     this.profileImage,
     this.googleId,
     this.isActive = true,
+    this.role,
     this.createdAt,
     this.updatedAt,
   });
@@ -27,6 +29,7 @@ class User {
       profileImage: json['profileImage'] as String?,
       googleId: json['googleId'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      role: json['role'] as String?,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
     );
@@ -40,6 +43,7 @@ class User {
       if (profileImage != null) 'profileImage': profileImage,
       if (googleId != null) 'googleId': googleId,
       'isActive': isActive,
+      if (role != null) 'role': role,
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };

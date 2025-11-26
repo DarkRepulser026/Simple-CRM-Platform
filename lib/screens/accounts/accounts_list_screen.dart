@@ -7,6 +7,7 @@ import '../../services/accounts_service.dart';
 import '../../navigation/app_router.dart';
 import 'account_detail_screen.dart';
 import '../../services/auth/auth_service.dart';
+import '../../widgets/role_visibility.dart';
 import '../../widgets/error_view.dart';
 // Error and loading widgets not used directly here
 
@@ -60,12 +61,12 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
       appBar: AppBar(
         title: const Text('Accounts'),
         actions: [
-          if (_apiAvailable && (locator<AuthService>().selectedOrganization?.role == 'Admin' || locator<AuthService>().selectedOrganization?.role == 'Manager'))
-            IconButton(
+          if (_apiAvailable)
+            ManagerOrAdminOnly(child: IconButton(
               onPressed: () => AppRouter.navigateTo(context, AppRouter.accountCreate),
               icon: const Icon(Icons.add),
               tooltip: 'Create Account',
-            ),
+            )),
         ],
       ),
         body: _apiAvailable

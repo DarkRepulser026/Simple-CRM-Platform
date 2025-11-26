@@ -57,6 +57,14 @@ class AuthServiceImpl implements AuthService {
           // ignore - optional behavior
         }
       }
+      // If we had a selectedOrganization from storage but it is missing a 'role', attempt to refresh it
+      if (_selectedOrganization != null && (_selectedOrganization?.role == null || _selectedOrganization?.role?.isEmpty == true)) {
+        try {
+          await selectOrganization(_selectedOrganization!.id);
+        } catch (_) {
+          // ignore - optional refresh
+        }
+      }
 
       debugPrint('AuthService initialized: loggedIn=$isLoggedIn, hasOrg=$hasSelectedOrganization');
     } catch (e) {
@@ -227,6 +235,16 @@ class AuthServiceImpl implements AuthService {
   String? get selectedOrganizationId => _selectedOrganization?.id;
 
   @override
+  @override
+  bool get isAdmin => _selectedOrganization?.role?.trim().toUpperCase() == 'ADMIN';
+
+  @override
+  bool get isManagerOrAdmin {
+    final r = _selectedOrganization?.role?.trim().toUpperCase();
+    return r == 'ADMIN' || r == 'MANAGER';
+  }
+
+  @override
   Future<void> selectOrganization(String organizationId) async {
     try {
       final orgService = locator<OrganizationsService>();
@@ -301,15 +319,66 @@ class AuthServiceImpl implements AuthService {
         return false;
       }
 
-      final authData = response.value; // { token: 'jwt', user: {..} }
+      final authData = response.value; // { token: 'jwt', user: {..}, organization: {id,name} }
       _jwtToken = authData['token'] as String;
       _currentUser = User.fromJson(authData['user'] as Map<String, dynamic>);
       await _storage.saveToken(_jwtToken!);
       await _storage.saveUser(jsonEncode(_currentUser!.toJson()));
+      // If server returned organization info (invite target), auto-select it
+      try {
+        final org = authData['organization'] as Map<String, dynamic>?;
+        if (org != null && org['id'] != null) {
+          await selectOrganization(org['id'] as String);
+        }
+      } catch (_) {
+        // ignore - selection is optional
+      }
       debugPrint('Invite accept sign-in success: ${_currentUser!.email}');
       return true;
     } catch (e) {
       debugPrint('Invite sign-in error: $e');
+      return false;
+    }
+  }
+
+  /// Helper for other methods to construct auth headers using current JWT and selected org
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final headers = <String, String>{};
+    if (_jwtToken != null) headers['Authorization'] = 'Bearer $_jwtToken';
+    if (_selectedOrganization != null && _selectedOrganization!.id.isNotEmpty) headers['X-Organization-ID'] = _selectedOrganization!.id;
+    return headers;
+  }
+
+  @override
+  Future<bool> acceptInviteTokenAsCurrentUser(String token, {String? name}) async {
+    try {
+      if (!isAuthenticated) return false;
+      final body = {'token': token};
+      if (name != null) body['name'] = name;
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiConfig.inviteAccept,
+        headers: await _getAuthHeaders(),
+        body: body,
+      );
+
+      if (response.isError) {
+        debugPrint('Accept invite as current user failed: ${response.error}');
+        return false;
+      }
+
+      // If the server returned an organization, auto-select it (but do not replace the current JWT or user)
+      final authData = response.value;
+      try {
+        final org = authData['organization'] as Map<String, dynamic>?;
+        if (org != null && org['id'] != null) {
+          await selectOrganization(org['id'] as String);
+        }
+      } catch (_) {}
+
+      debugPrint('Invite accepted for current user');
+      return true;
+    } catch (e) {
+      debugPrint('Accept invite as current user error: $e');
       return false;
     }
   }
