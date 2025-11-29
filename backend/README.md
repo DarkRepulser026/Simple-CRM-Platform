@@ -237,6 +237,22 @@ node test-db.js
 - `SESSION_SECRET` - Session secret for Passport (generate with `openssl rand -hex 32`)
 - `PORT` - Server port (default: 3000)
 
+### Email / SMTP / SES
+
+- `MAIL_DRIVER` - How the app sends mail: `smtp` (default), `console` (do not send, logs only), or `ses-smtp` (use AWS SES via SMTP credentials). Default: `smtp`.
+- `SMTP_HOST` - Hostname for SMTP (e.g. `smtp.sendgrid.net` or AWS SES SMTP endpoint like `email-smtp.us-east-1.amazonaws.com`).
+- `SMTP_PORT` - SMTP port (default: `587`).
+- `SMTP_SECURE` - `true` if using TLS on connect (465). If false, STARTTLS is used.
+- `SMTP_USER` - SMTP username (for SES this is the SMTP user credentials, not IAM keys).
+- `SMTP_PASS` - SMTP password.
+- `MAIL_FROM` - "from" email address used for outgoing mail (default `no-reply@example.com`).
+- `APP_BASE_URL` - The web app base URL used in invite links (default: `http://localhost:3000`).
+- `SEND_WELCOME_EMAILS` - Set to `true` to automatically send a welcome email when an admin creates a user via the `POST /users` endpoint.
+
+If you're using AWS SES, you can either use SES's SMTP interface (recommended for simplicity) and set the SMTP_* variables OR use the SES SMTP endpoint and credentials. SES SMTP credentials can be generated from the AWS console.
+
+To test email sending locally without actual mail delivery, set `MAIL_DRIVER=console`.
+
 ## Security Notes
 
 - Never commit `.env` file to version control
