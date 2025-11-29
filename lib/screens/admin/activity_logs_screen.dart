@@ -29,6 +29,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
   String? _search;
   int _filterVersion = 0;
   List<User>? _users;
+  final Set<String> _fetchedUserIds = {};
 
   Future<List<ActivityLog>> _fetchPage(int page, int limit) async {
     if (!_apiAvailable) throw Exception('Activity logs API not available on server');
@@ -58,6 +59,9 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
         _search = args.search;
         _filterVersion++;
       });
+      // Attempt to ensure the selected user is loaded into _users so the dropdown can
+      // render without assertion.
+      _ensureSelectedUserLoaded();
     }
   }
 
@@ -73,7 +77,48 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
     if (!locator<AuthService>().isLoggedIn || !locator<AuthService>().hasSelectedOrganization) return;
     final res = await _usersService.getUsers(limit: 200);
     if (res.isSuccess) {
-      setState(() => _users = res.value.users);
+      final loaded = res.value.users;
+      setState(() => _users = loaded);
+      // Ensure that selected user is present in the loaded list. If not, try fetching
+      // the specific user (sometimes we navigate with a userId which isn't in the
+      // default listing), or add a placeholder so DropdownButton doesn't assert.
+      if (_selectedUserId != null && !_users!.any((u) => u.id == _selectedUserId!)) {
+        await _ensureSelectedUserLoaded();
+      }
+    }
+  }
+
+  Future<void> _ensureSelectedUserLoaded() async {
+    if (_selectedUserId == null) return;
+    if (_users != null && _users!.any((u) => u.id == _selectedUserId!)) return;
+    if (_fetchedUserIds.contains(_selectedUserId)) return;
+    _fetchedUserIds.add(_selectedUserId!);
+
+    try {
+      final resp = await _usersService.getUser(_selectedUserId!);
+      if (resp.isSuccess) {
+        setState(() {
+          final list = List<User>.from(_users ?? []);
+          // Avoid duplicates
+          if (!list.any((u) => u.id == resp.value.id)) list.add(resp.value);
+          _users = list;
+        });
+      } else {
+        // If fetch failed (user might be deleted), insert a placeholder item to avoid dropdown assertion
+        setState(() {
+          final list = List<User>.from(_users ?? []);
+          final placeholder = User(id: _selectedUserId!, email: '', name: _selectedUserId!);
+          if (!list.any((u) => u.id == placeholder.id)) list.add(placeholder);
+          _users = list;
+        });
+      }
+    } catch (_) {
+      setState(() {
+        final list = List<User>.from(_users ?? []);
+        final placeholder = User(id: _selectedUserId!, email: '', name: _selectedUserId!);
+        if (!list.any((u) => u.id == placeholder.id)) list.add(placeholder);
+        _users = list;
+      });
     }
   }
 
@@ -87,6 +132,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
     final userItems = <DropdownMenuItem<String?>>[DropdownMenuItem<String?>(value: null, child: Text('All'))];
     final users = _users ?? [];
     userItems.addAll(users.map((u) => DropdownMenuItem<String?>(value: u.id, child: Text(u.name))).toList());
+    final dropdownSelectedUserId = (_selectedUserId != null && userItems.any((it) => it.value == _selectedUserId)) ? _selectedUserId : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -104,24 +150,32 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String?>(
-                          value: _selectedEntityType,
-                          decoration: const InputDecoration(labelText: 'Entity Type'),
-                          items: const [
-                            DropdownMenuItem(value: null, child: Text('All')),
-                            DropdownMenuItem(value: 'Account', child: Text('Account')),
-                            DropdownMenuItem(value: 'Contact', child: Text('Contact')),
-                            DropdownMenuItem(value: 'Lead', child: Text('Lead')),
-                            DropdownMenuItem(value: 'Ticket', child: Text('Ticket')),
-                            DropdownMenuItem(value: 'Task', child: Text('Task')),
-                          ],
-                          onChanged: (v) => setState(() => _selectedEntityType = v),
-                        ),
-                      ),
+                          child: Builder(builder: (_) {
+                            // Build a dynamic list of entity type items and include any selected
+                            // entity type that isn't part of the default list (e.g., 'User').
+                            final entityItems = <DropdownMenuItem<String?>>[
+                              const DropdownMenuItem(value: null, child: Text('All')),
+                              const DropdownMenuItem(value: 'Account', child: Text('Account')),
+                              const DropdownMenuItem(value: 'Contact', child: Text('Contact')),
+                              const DropdownMenuItem(value: 'Lead', child: Text('Lead')),
+                              const DropdownMenuItem(value: 'Ticket', child: Text('Ticket')),
+                              const DropdownMenuItem(value: 'Task', child: Text('Task')),
+                            ];
+                            if (_selectedEntityType != null && !entityItems.any((it) => it.value == _selectedEntityType)) {
+                              entityItems.add(DropdownMenuItem(value: _selectedEntityType, child: Text(_selectedEntityType!)));
+                            }
+                            final dropdownSelectedEntityType = (_selectedEntityType != null && entityItems.any((it) => it.value == _selectedEntityType)) ? _selectedEntityType : null;
+                            return DropdownButtonFormField<String?>(
+                              value: dropdownSelectedEntityType,
+                              decoration: const InputDecoration(labelText: 'Entity Type'),
+                              items: entityItems,
+                              onChanged: (v) => setState(() => _selectedEntityType = v),
+                            );
+                          })),
                       const SizedBox(width: 8),
                       Expanded(
                         child: DropdownButtonFormField<String?>(
-                          value: _selectedUserId,
+                          value: dropdownSelectedUserId,
                           decoration: const InputDecoration(labelText: 'User'),
                           items: userItems,
                           onChanged: (v) => setState(() => _selectedUserId = v),

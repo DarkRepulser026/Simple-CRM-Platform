@@ -1518,6 +1518,15 @@ app.post('/users', authenticateToken, requireOrganization, authorize(['MANAGE_US
     // Associate user into organization
     await prisma.userOrganization.create({ data: { userId: user.id, organizationId: req.organizationId, role: role || 'VIEWER' } });
     await createActivityLogEntry({ action: 'USER_CREATED', entityType: 'User', entityId: user.id, description: `${req.user.email} created user ${user.email}`, userId: req.user.id, organizationId: req.organizationId });
+    // Optionally send a welcome email for newly created users
+    try {
+      if (process.env.SEND_WELCOME_EMAILS === 'true') {
+        await mailer.sendWelcomeEmail(user.email, user.name, (await prisma.organization.findUnique({ where: { id: req.organizationId } })).name);
+      }
+    } catch (e) {
+      console.warn('Failed to send welcome email', e);
+      // don't fail the request if sending email fails
+    }
     res.status(201).json(user);
   } catch (err) {
     console.error('Create user error:', err);
