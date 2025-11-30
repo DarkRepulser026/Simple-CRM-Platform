@@ -5,6 +5,7 @@ import passport from 'passport';
 import cookieParser from 'cookie-parser';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import prisma from './lib/prismaClient.js';
+import { ALLOWED_PERMISSIONS, normalizePermissionsArray as normalizePermissionsArrayLib, normalizeRoleType as normalizeRoleTypeLib, getUserPermissions as getUserPermissionsLib } from './lib/permissions.js';
 import mailer from './lib/mailer.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -246,15 +247,8 @@ const requireOrganization = (req, res, next) => {
   next();
 };
 
-// Helper to get user permissions for an organization by resolving the user's role
-const getUserPermissions = async (userId, organizationId) => {
-  const userOrg = await prisma.userOrganization.findFirst({ where: { userId, organizationId } });
-  if (!userOrg) return [];
-  const roleType = userOrg.role;
-  const role = await prisma.userRole.findFirst({ where: { organizationId, roleType } });
-  if (!role) return [];
-  return role.permissions || [];
-};
+// Wrapper around helper from lib/permissions, bound to the Prisma client
+const getUserPermissions = async (userId, organizationId) => getUserPermissionsLib(prisma, userId, organizationId);
 
 // Centralized helper to create activity log entries (standardizes metadata & optional activity options)
 const createActivityLogEntry = async ({ action, entityType, entityId, description, userId, organizationId, metadata = null }) => {
@@ -270,27 +264,18 @@ const createActivityLogEntry = async ({ action, entityType, entityId, descriptio
 };
 
 // Helpers to map user-provided role and permission strings to Prisma enum values
-const normalizeRoleType = (value) => {
-  if (!value) return null;
-  const v = String(value).toUpperCase().replace(/[^A-Z_]/g, '_');
-  const allowed = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
-  return allowed.includes(v) ? v : null;
-};
+// helper wrappers for backward-compatible usage
+const normalizeRoleType = normalizeRoleTypeLib;
 
-const ALLOWED_PERMISSIONS = [
+// ALLOWED_PERMISSIONS moved to lib/permissions for reuse
+const ALLOWED_PERMISSIONS_LOCAL = ALLOWED_PERMISSIONS;
   'VIEW_CONTACTS','CREATE_CONTACTS','EDIT_CONTACTS','DELETE_CONTACTS','VIEW_LEADS','CREATE_LEADS','EDIT_LEADS','DELETE_LEADS','CONVERT_LEADS',
   'VIEW_TICKETS','CREATE_TICKETS','EDIT_TICKETS','DELETE_TICKETS','ASSIGN_TICKETS','RESOLVE_TICKETS',
   'VIEW_TASKS','CREATE_TASKS','EDIT_TASKS','DELETE_TASKS','ASSIGN_TASKS',
   'VIEW_DASHBOARD','VIEW_REPORTS','MANAGE_USERS','MANAGE_ROLES','MANAGE_ORGANIZATION','VIEW_AUDIT_LOGS'
 ];
 
-const normalizePermissionsArray = (arr) => {
-  if (!arr || !Array.isArray(arr)) return [];
-  const mapped = arr.map((p) => String(p).toUpperCase().replace(/[^A-Z_]/g, '_'));
-  const invalid = mapped.filter(p => !ALLOWED_PERMISSIONS.includes(p));
-  if (invalid.length) return null; // invalid permissions present
-  return mapped;
-};
+const normalizePermissionsArray = (arr) => normalizePermissionsArrayLib(arr);
 
 // Authorization middleware - requires at least one permission to pass
 const authorize = (requiredPermissions) => {
@@ -1234,6 +1219,95 @@ app.put('/tickets/:id', authenticateToken, requireOrganization, authorize(['EDIT
     await createActivityLogEntry({ action: 'TICKET_UPDATED', entityType: 'Ticket', entityId: updated.id, description: `Ticket updated by ${req.user.email}`, userId: req.user.id, organizationId: req.organizationId, metadata: { oldValues, newValues } });
     res.json(updated);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Assign ticket to agent
+app.post('/tickets/:id/assign', authenticateToken, requireOrganization, authorize(['ASSIGN_TICKETS']), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { assignedToId } = req.body;
+    if (!assignedToId) return res.status(400).json({ message: 'assignedToId is required' });
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.organizationId !== req.organizationId) return res.status(404).json({ message: 'Ticket not found' });
+    // Verify agent exists in organization
+    const agentOrg = await prisma.userOrganization.findFirst({ where: { userId: assignedToId, organizationId: req.organizationId } });
+    if (!agentOrg) return res.status(400).json({ message: 'Assigned user not in organization' });
+    const updated = await prisma.ticket.update({ where: { id: ticketId }, data: { ownerId: assignedToId } });
+    await createActivityLogEntry({ action: 'TICKET_ASSIGNED', entityType: 'Ticket', entityId: updated.id, description: `${req.user.email} assigned ticket to ${assignedToId}`, userId: req.user.id, organizationId: req.organizationId });
+    // Create a ticket message recording the assignment
+    await prisma.ticketMessage.create({ data: { ticketId: updated.id, authorId: req.user.id, content: `Assigned to user ${assignedToId}`, isInternal: true } });
+    res.json(updated);
+  } catch (error) {
+    console.error('Assign ticket error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Resolve ticket (add optional resolution message)
+app.post('/tickets/:id/resolve', authenticateToken, requireOrganization, authorize(['RESOLVE_TICKETS']), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.organizationId !== req.organizationId) return res.status(404).json({ message: 'Ticket not found' });
+    const { resolution } = req.body;
+    const updated = await prisma.ticket.update({ where: { id: ticketId }, data: { status: 'RESOLVED' } });
+    if (resolution) {
+      await prisma.ticketMessage.create({ data: { ticketId: ticketId, authorId: req.user.id, content: `Resolution: ${String(resolution)}`, isInternal: true } });
+    }
+    await createActivityLogEntry({ action: 'TICKET_RESOLVED', entityType: 'Ticket', entityId: updated.id, description: `${req.user.email} resolved ticket ${updated.id}`, userId: req.user.id, organizationId: req.organizationId });
+    res.json(updated);
+  } catch (error) {
+    console.error('Resolve ticket error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Close ticket
+app.post('/tickets/:id/close', authenticateToken, requireOrganization, authorize(['RESOLVE_TICKETS']), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.organizationId !== req.organizationId) return res.status(404).json({ message: 'Ticket not found' });
+    const updated = await prisma.ticket.update({ where: { id: ticketId }, data: { status: 'CLOSED' } });
+    await createActivityLogEntry({ action: 'TICKET_CLOSED', entityType: 'Ticket', entityId: updated.id, description: `${req.user.email} closed ticket ${updated.id}`, userId: req.user.id, organizationId: req.organizationId });
+    res.json(updated);
+  } catch (error) {
+    console.error('Close ticket error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Reopen ticket
+app.post('/tickets/:id/reopen', authenticateToken, requireOrganization, authorize(['EDIT_TICKETS']), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.organizationId !== req.organizationId) return res.status(404).json({ message: 'Ticket not found' });
+    const updated = await prisma.ticket.update({ where: { id: ticketId }, data: { status: 'OPEN' } });
+    await createActivityLogEntry({ action: 'TICKET_REOPENED', entityType: 'Ticket', entityId: updated.id, description: `${req.user.email} reopened ticket ${updated.id}`, userId: req.user.id, organizationId: req.organizationId });
+    res.json(updated);
+  } catch (error) {
+    console.error('Reopen ticket error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Add satisfaction rating to ticket
+app.post('/tickets/:id/satisfaction', authenticateToken, requireOrganization, authorize(['VIEW_TICKETS']), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.organizationId !== req.organizationId) return res.status(404).json({ message: 'Ticket not found' });
+    const { rating, feedback } = req.body;
+    if (rating == null) return res.status(400).json({ message: 'rating is required' });
+    const content = `Satisfaction rating: ${rating}${feedback ? ' • ' + String(feedback) : ''}`;
+    const msg = await prisma.ticketMessage.create({ data: { ticketId: ticketId, authorId: req.user.id, content, isInternal: false } });
+    await createActivityLogEntry({ action: 'TICKET_SATISFACTION', entityType: 'Ticket', entityId: ticketId, description: `${req.user.email} left satisfaction rating ${rating} for ticket ${ticketId}`, userId: req.user.id, organizationId: req.organizationId });
+    res.json({ success: true, message: msg });
+  } catch (error) {
+    console.error('Ticket satisfaction error:', error);
     res.status(500).json({ message: error.message });
   }
 });

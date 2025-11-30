@@ -227,6 +227,16 @@ Run the database connection test:
 node test-db.js
 ```
 
+To run the full integration test suite (mocha):
+
+```bash
+cd backend
+npm install
+npm test
+```
+
+The tests will start the server in a child process, run a series of integration tests against the HTTP endpoints, and clean up created resources when possible.
+
 ## Environment Variables
 
 - `DATABASE_URL` - PostgreSQL connection string

@@ -13,7 +13,7 @@
     "grant-admin": "node scripts/grant-admin-permissions.js",
     "seed-demo": "node scripts/seed-sample-data.js",
     "server:test": "node scripts/test-start.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha --timeout 20000 \"test/**/*.js\""
   },
   "keywords": [],
   "author": "",
@@ -36,7 +36,10 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
-    "prisma": "^6.18.0"
+    "prisma": "^6.18.0",
+    "mocha": "^10.2.0",
+    "chai": "^4.3.7",
+    "cross-env": "^7.0.3"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
