@@ -23,7 +23,9 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _typeCtrl = TextEditingController();
+  
   bool _isLoading = true;
+  bool _isSaving = false;
   String? _error;
   Account? _account;
 
@@ -35,6 +37,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _isLoading = true);
     try {
       final res = await _accountsService.getAccount(widget.accountId);
       if (res.isSuccess) {
@@ -42,9 +45,9 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
         _nameCtrl.text = _account?.name ?? '';
         _typeCtrl.text = _account?.type ?? '';
         setState(() => _isLoading = false);
-        return;
+      } else {
+        throw Exception(res.error.message);
       }
-      throw Exception(res.error.message);
     } catch (e) {
       setState(() {
         _error = 'Failed to load account: $e';
@@ -55,7 +58,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
 
   Future<void> _update() async {
     if (!_formKey.currentState!.validate() || _account == null) return;
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
+    
     try {
       final updated = _account!.copyWith(
         name: _nameCtrl.text.trim(),
@@ -63,38 +67,136 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
         updatedAt: DateTime.now(),
       );
       final res = await _accountsService.updateAccount(updated);
+      
       if (res.isSuccess) {
-        Navigator.of(context).pop(true);
-        return;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account updated successfully')));
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        throw Exception(res.error.message);
       }
-      throw Exception(res.error.message);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: LoadingView(message: 'Loading...'));
+    if (_isLoading) return const Scaffold(body: LoadingView(message: 'Loading account details...'));
     if (_error != null) return Scaffold(body: ErrorView(message: _error!, onRetry: _load));
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    
+    final inputDecor = InputDecoration(
+      filled: true,
+      fillColor: cs.surfaceVariant.withOpacity(0.3),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outline.withOpacity(0.1))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary, width: 1.5)),
+      contentPadding: const EdgeInsets.all(16),
+    );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Account')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Account Name'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,),
-              const SizedBox(height: 12),
-              TextFormField(controller: _typeCtrl, decoration: const InputDecoration(labelText: 'Type')),
-              const SizedBox(height: 20),
-              if (_isLoading) const LoadingView(message: 'Updating account...')
-              else ElevatedButton(onPressed: _update, child: const Text('Save'))
-            ],
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        title: const Text('Edit Account'),
+        backgroundColor: const Color(0xFFF3F4F6),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.close, color: cs.onSurface),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Card(
+              elevation: 4,
+              shadowColor: Colors.black.withOpacity(0.05),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              color: cs.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: cs.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            child: Icon(Icons.business_outlined, size: 28, color: cs.primary),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Account Details', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                              Text('Update company information', style: TextStyle(color: cs.onSurfaceVariant)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Fields
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: inputDecor.copyWith(
+                          labelText: 'Account Name',
+                          prefixIcon: Icon(Icons.domain, color: cs.primary),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _typeCtrl,
+                        decoration: inputDecor.copyWith(
+                          labelText: 'Account Type',
+                          prefixIcon: Icon(Icons.category_outlined, color: cs.onSurfaceVariant),
+                          hintText: 'e.g. Customer, Partner, Reseller',
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 40),
+
+                      // Actions
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 16),
+                          FilledButton.icon(
+                            onPressed: _isSaving ? null : _update,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: _isSaving 
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.save_outlined),
+                            label: Text(_isSaving ? 'Saving...' : 'Save Changes'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -18,19 +18,28 @@ class _UserEditScreenState extends State<UserEditScreen> {
   late final UsersService _usersService;
   bool _isLoading = true;
   String? _error;
+
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+
   bool _isActive = true;
   bool _canEditRole = false;
   String? _role;
-  List<String> _availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+  final List<String> _availableRoles = const ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
 
   @override
   void initState() {
     super.initState();
     _usersService = locator<UsersService>();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -42,19 +51,26 @@ class _UserEditScreenState extends State<UserEditScreen> {
         _emailCtrl.text = u.email;
         _role = u.role;
         _isActive = u.isActive;
-        final myRole = locator<AuthService>().selectedOrganization?.role?.toUpperCase();
+
+        final myRole =
+            locator<AuthService>().selectedOrganization?.role?.toUpperCase();
         _canEditRole = (myRole == 'ADMIN' || myRole == 'MANAGER');
+
         setState(() => _isLoading = false);
         return;
       }
       throw Exception(res.error.message);
     } catch (e) {
-      setState(() => _error = 'Failed to load user: $e');
+      setState(() {
+        _error = 'Failed to load user: $e';
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
     try {
       final user = User(
@@ -66,6 +82,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
         isActive: _isActive,
         role: _role,
       );
+
       final res = await _usersService.updateUser(user);
       if (res.isSuccess) {
         Navigator.of(context).pop(true);
@@ -73,38 +90,193 @@ class _UserEditScreenState extends State<UserEditScreen> {
       }
       throw Exception(res.error.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: LoadingView(message: 'Loading...'));
-    if (_error != null) return Scaffold(body: ErrorView(message: _error!, onRetry: _load));
+    const bgColor = Color(0xFFE9EDF5); // nền CRM đồng bộ
+
+    if (_isLoading) {
+      return const Scaffold(body: LoadingView(message: 'Loading...'));
+    }
+    if (_error != null) {
+      return Scaffold(body: ErrorView(message: _error!, onRetry: _load));
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit User')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a name' : null),
-              const SizedBox(height: 12),
-              TextFormField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'Email'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter an email' : null),
-              const SizedBox(height: 12),
-              if (_canEditRole)
-                DropdownButtonFormField<String>(
-                  value: _role,
-                  decoration: const InputDecoration(labelText: 'Role'),
-                  items: _availableRoles.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                  onChanged: (v) => setState(() => _role = v),
+      backgroundColor: bgColor,
+      appBar: AppBar(
+        backgroundColor: bgColor,
+        elevation: 0,
+        title: const Text('Edit user'),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.08),
                 ),
-              SwitchListTile(title: const Text('Active'), value: _isActive, onChanged: (v) => setState(() => _isActive = v)),
-              const SizedBox(height: 20),
-              ElevatedButton(onPressed: _save, child: const Text('Save')),
-            ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title + subtitle
+                    Text(
+                      'Profile & permissions',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Update basic information, role and status of this user.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Name
+                    TextFormField(
+                      controller: _nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Full name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Please enter a name' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Email
+                    TextFormField(
+                      controller: _emailCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Please enter an email' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Role + Active
+                    Row(
+                      children: [
+                        if (_canEditRole)
+                          Expanded(
+                            flex: 3,
+                            child: DropdownButtonFormField<String>(
+                              value: _role,
+                              decoration: const InputDecoration(
+                                labelText: 'Role',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: _availableRoles
+                                  .map(
+                                    (r) => DropdownMenuItem(
+                                      value: r,
+                                      child: Text(r),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(() => _role = v),
+                            ),
+                          )
+                        else
+                          Expanded(
+                            flex: 3,
+                            child: TextFormField(
+                              enabled: false,
+                              initialValue: _role ?? 'VIEWER',
+                              decoration: const InputDecoration(
+                                labelText: 'Role',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Status',
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _isActive
+                                          ? Icons.check_circle
+                                          : Icons.pause_circle_filled,
+                                      size: 18,
+                                      color: _isActive ? Colors.green : Colors.red,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(_isActive ? 'Active' : 'Inactive'),
+                                  ],
+                                ),
+                                Switch(
+                                  value: _isActive,
+                                  onChanged: (v) =>
+                                      setState(() => _isActive = v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Actions
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('Save changes'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

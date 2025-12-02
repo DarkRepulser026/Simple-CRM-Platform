@@ -8,7 +8,8 @@ services:
       - POSTGRES_PASSWORD=mypassword
       - POSTGRES_DB=main_project
     ports:
-      - "5433:5432" # Map container port 5432 to host 5433 to match .env DATABASE_URL
+      # - "5433:5432"
+      - "5432:5432" # Map container port 5432 to host 5433 to match .env DATABASE_URL
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

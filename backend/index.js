@@ -184,13 +184,44 @@ app.use((err, req, res, next) => {
 });
 
 // Health check endpoint to verify server + database connectivity
+// app.get('/health', async (req, res) => {
+//   try {
+//     const ok = await checkDatabaseConnection(1, 0);
+//     if (ok) return res.json({ status: 'ok' });
+//     return res.status(500).json({ status: 'error', message: 'Database connection failed' });
+//   } catch (e) {
+//     return res.status(500).json({ status: 'error', message: e.message });
+//   }
+// });
+
 app.get('/health', async (req, res) => {
   try {
-    const ok = await checkDatabaseConnection(1, 0);
-    if (ok) return res.json({ status: 'ok' });
-    return res.status(500).json({ status: 'error', message: 'Database connection failed' });
+    const dbOk = await checkDatabaseConnection(1, 0);
+
+    if (dbOk) {
+      return res.json({
+        status: 'Healthy',              // <--- đổi ở đây
+        details: {
+          database: 'up'
+        }
+      });
+    }
+
+    return res.status(500).json({
+      status: 'Unhealthy',             // <--- thay cho 'error'
+      message: 'Database connection failed',
+      details: {
+        database: 'down'
+      }
+    });
   } catch (e) {
-    return res.status(500).json({ status: 'error', message: e.message });
+    return res.status(500).json({
+      status: 'Unhealthy',
+      message: e.message,
+      details: {
+        database: 'error'
+      }
+    });
   }
 });
 

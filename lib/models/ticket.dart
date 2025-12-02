@@ -21,6 +21,7 @@ enum TicketStatus {
 /// Ticket priority enumeration
 enum TicketPriority {
   low('Low'),
+  medium('Medium'), // Đã thêm Medium
   normal('Normal'),
   high('High'),
   urgent('Urgent'),
@@ -63,6 +64,10 @@ enum TicketType {
 /// Ticket model representing a customer support ticket
 class Ticket {
   final String id;
+  
+  // Đã thêm trường này
+  final String? ticketNumber; 
+  
   final String subject;
   final String? description;
   final TicketStatus status;
@@ -72,6 +77,10 @@ class Ticket {
   final String? contactId;
   final String? accountId;
   final String? assignedToId;
+  
+  // Đã thêm trường này (tên người được giao, để hiển thị nhanh)
+  final String? assigneeName; 
+
   final String? createdById;
   final String organizationId;
   final DateTime? dueDate;
@@ -84,6 +93,7 @@ class Ticket {
 
   const Ticket({
     required this.id,
+    this.ticketNumber,
     required this.subject,
     this.description,
     required this.status,
@@ -93,6 +103,7 @@ class Ticket {
     this.contactId,
     this.accountId,
     this.assignedToId,
+    this.assigneeName,
     this.createdById,
     required this.organizationId,
     this.dueDate,
@@ -128,6 +139,7 @@ class Ticket {
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
       id: json['id'] ?? '',
+      ticketNumber: json['ticketNumber'], // Map từ JSON
       subject: json['subject'] ?? '',
       description: json['description'],
       status: TicketStatus.fromString(json['status'] ?? 'Open'),
@@ -137,6 +149,7 @@ class Ticket {
       contactId: json['contactId'],
       accountId: json['accountId'],
       assignedToId: json['assignedToId'],
+      assigneeName: json['assigneeName'], // Map từ JSON
       createdById: json['createdById'],
       organizationId: json['organizationId'] ?? '',
       dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
@@ -157,6 +170,7 @@ class Ticket {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'ticketNumber': ticketNumber,
       'subject': subject,
       'description': description,
       'status': status.value,
@@ -166,6 +180,7 @@ class Ticket {
       'contactId': contactId,
       'accountId': accountId,
       'assignedToId': assignedToId,
+      'assigneeName': assigneeName,
       'createdById': createdById,
       'organizationId': organizationId,
       'dueDate': dueDate?.toIso8601String(),
@@ -181,6 +196,7 @@ class Ticket {
   /// Create a copy of Ticket with modified fields
   Ticket copyWith({
     String? id,
+    String? ticketNumber,
     String? subject,
     String? description,
     TicketStatus? status,
@@ -190,6 +206,7 @@ class Ticket {
     String? contactId,
     String? accountId,
     String? assignedToId,
+    String? assigneeName,
     String? createdById,
     String? organizationId,
     DateTime? dueDate,
@@ -202,6 +219,7 @@ class Ticket {
   }) {
     return Ticket(
       id: id ?? this.id,
+      ticketNumber: ticketNumber ?? this.ticketNumber,
       subject: subject ?? this.subject,
       description: description ?? this.description,
       status: status ?? this.status,
@@ -211,6 +229,7 @@ class Ticket {
       contactId: contactId ?? this.contactId,
       accountId: accountId ?? this.accountId,
       assignedToId: assignedToId ?? this.assignedToId,
+      assigneeName: assigneeName ?? this.assigneeName,
       createdById: createdById ?? this.createdById,
       organizationId: organizationId ?? this.organizationId,
       dueDate: dueDate ?? this.dueDate,
@@ -235,6 +254,6 @@ class Ticket {
 
   @override
   String toString() {
-    return 'Ticket(id: $id, subject: $subject, status: ${status.value}, priority: ${priority.value})';
+    return 'Ticket(id: $id, number: $ticketNumber, subject: $subject)';
   }
 }

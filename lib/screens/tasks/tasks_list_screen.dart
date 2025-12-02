@@ -7,7 +7,6 @@ import '../../widgets/error_view.dart';
 import '../../services/tasks_service.dart';
 import '../../services/service_locator.dart';
 
-/// List screen for displaying and managing tasks with pagination
 class TasksListScreen extends StatefulWidget {
   const TasksListScreen({super.key});
 
@@ -17,19 +16,41 @@ class TasksListScreen extends StatefulWidget {
 
 class _TasksListScreenState extends State<TasksListScreen> {
   late final TasksService _tasksService;
-  
+  final TextEditingController _searchCtrl = TextEditingController();
+  int _reloadVersion = 0; // Dùng để reload list
+
   @override
   void initState() {
     super.initState();
     _tasksService = locator<TasksService>();
   }
-  
-  
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<List<Task>> _fetchTasksPage(int page, int limit) async {
     try {
-      final res = await _tasksService.getTasks(page: page, limit: limit);
+      final res = await _tasksService.getTasks(
+        page: page,
+        limit: limit,
+        // search: _searchCtrl.text // Truyền search nếu API hỗ trợ
+      );
       if (res.isSuccess) {
-        return res.value.tasks;
+        var tasks = res.value.tasks;
+
+        // Filter local đơn giản (nếu API chưa hỗ trợ search)
+        if (_searchCtrl.text.isNotEmpty) {
+          final q = _searchCtrl.text.toLowerCase();
+          tasks = tasks.where((t) => 
+            t.subject.toLowerCase().contains(q) || 
+            (t.description ?? '').toLowerCase().contains(q)
+          ).toList();
+        }
+
+        return tasks;
       }
       throw Exception(res.error.message);
     } catch (e) {
@@ -37,264 +58,383 @@ class _TasksListScreenState extends State<TasksListScreen> {
     }
   }
 
+  void _refreshList() {
+    setState(() => _reloadVersion++);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (locator<AuthService>().isLoggedIn && !locator<AuthService>().hasSelectedOrganization) {
-      return Scaffold(body: ErrorView(message: 'No organization selected. Please select a company to continue.', onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection)));
+    final auth = locator<AuthService>();
+
+    if (auth.isLoggedIn && !auth.hasSelectedOrganization) {
+      return Scaffold(
+        body: ErrorView(
+          message: 'No organization selected. Please select a company to continue.',
+          onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection),
+        ),
+      );
     }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    const bgColor = Color(0xFFE9EDF5); // Màu nền Dashboard chuẩn
+
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('Tasks'),
+        elevation: 0,
+        backgroundColor: bgColor,
+        centerTitle: false,
+        titleSpacing: 0,
+        title: const Text(''),
+        iconTheme: IconThemeData(color: colorScheme.onSurface),
         actions: [
           IconButton(
-            onPressed: () => AppRouter.navigateTo(context, AppRouter.taskCreate),
-            icon: const Icon(Icons.add),
-            tooltip: 'Add Task',
+            tooltip: 'Refresh',
+            onPressed: _refreshList,
+            icon: const Icon(Icons.refresh),
           ),
-          IconButton(
-            onPressed: () {
-              // TODO: Implement search
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Search coming soon!')),
-              );
-            },
-            icon: const Icon(Icons.search),
-            tooltip: 'Search Tasks',
-          ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: PaginatedListView<Task>(
-        fetchPage: _fetchTasksPage,
-        itemBuilder: (context, task, index) => TaskListItem(
-          task: task,
-          onTap: () => AppRouter.navigateTo(
-            context,
-            AppRouter.taskDetail,
-            arguments: TaskDetailArgs(taskId: task.id),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ===== HEADER ROW =====
+                Row(
+                  children: [
+                    Text(
+                      'Tasks',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Work',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ===== FILTER & ACTIONS =====
+                Row(
+                  children: [
+                    // Search
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Search by subject or description',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: colorScheme.surface.withOpacity(0.9),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(999),
+                            borderSide: BorderSide(
+                              color: colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 0, horizontal: 12
+                          ),
+                        ),
+                        onSubmitted: (_) => _refreshList(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    
+                    // New Task Button
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final res = await AppRouter.navigateTo(context, AppRouter.taskCreate);
+                        if (res == true) _refreshList();
+                      },
+                      icon: const Icon(Icons.add_task, size: 18),
+                      label: const Text('New task'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ===== MAIN TABLE CARD =====
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colorScheme.outline.withOpacity(0.08)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Table Header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                            color: colorScheme.surfaceVariant.withOpacity(0.2),
+                          ),
+                          child: Row(
+                            children: [
+                              _HeaderCell('Subject', flex: 4),
+                              _HeaderCell('Priority', flex: 2),
+                              _HeaderCell('Status', flex: 2),
+                              _HeaderCell('Due Date', flex: 2),
+                              _HeaderCell('Created', flex: 2, align: TextAlign.right),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+
+                        // Table Body
+                        Expanded(
+                          child: PaginatedListView<Task>(
+                            key: ValueKey(_reloadVersion),
+                            fetchPage: _fetchTasksPage,
+                            pageSize: 20,
+                            emptyMessage: 'No tasks found',
+                            errorMessage: 'Failed to load tasks',
+                            loadingMessage: 'Loading tasks...',
+                            itemBuilder: (context, task, index) => _TaskRow(
+                              task: task,
+                              onTap: () => AppRouter.navigateTo(
+                                context,
+                                AppRouter.taskDetail,
+                                arguments: TaskDetailArgs(taskId: task.id),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        emptyMessage: 'No tasks found',
-        errorMessage: 'Failed to load tasks',
       ),
     );
   }
 }
 
-/// Individual task item widget
-class TaskListItem extends StatelessWidget {
+class _HeaderCell extends StatelessWidget {
+  final String label;
+  final int flex;
+  final TextAlign align;
+
+  const _HeaderCell(this.label, {this.flex = 1, this.align = TextAlign.left});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        label,
+        textAlign: align,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskRow extends StatelessWidget {
   final Task task;
   final VoidCallback onTap;
 
-  const TaskListItem({
-    super.key,
-    required this.task,
-    required this.onTap,
-  });
+  const _TaskRow({required this.task, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = theme.colorScheme;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    // Date formatting
+    final createdStr = "${task.createdAt.year}-${task.createdAt.month.toString().padLeft(2,'0')}-${task.createdAt.day.toString().padLeft(2,'0')}";
+    final dueDateStr = task.dueDate != null 
+        ? "${task.dueDate!.year}-${task.dueDate!.month.toString().padLeft(2,'0')}-${task.dueDate!.day.toString().padLeft(2,'0')}"
+        : "—";
+
+    return InkWell(
+      onTap: onTap,
+      hoverColor: cs.surfaceVariant.withOpacity(0.1),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: cs.outline.withOpacity(0.06))),
+        ),
+        child: Row(
+          children: [
+            // Subject
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      task.subject,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusChip(context),
-                ],
-              ),
-              if (task.description != null && task.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  task.description!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildPriorityIndicator(context),
-                  const SizedBox(width: 16),
-                  if (task.dueDate != null) ...[
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: task.isOverdue
-                          ? colorScheme.error
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatDueDate(task.dueDate!),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: task.isOverdue
-                            ? colorScheme.error
-                            : colorScheme.onSurfaceVariant,
-                        fontWeight: task.isOverdue ? FontWeight.w600 : null,
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
                   Text(
-                    _formatDate(task.createdAt),
+                    task.subject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  if (task.description != null && task.description!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        task.description!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Priority
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  _priorityIcon(task.priority, cs),
+                  const SizedBox(width: 6),
+                  Text(
+                    task.priority.value,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                      color: _priorityColor(task.priority, cs),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+
+            // Status
+            Expanded(
+              flex: 2,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _StatusChip(task: task),
+              ),
+            ),
+
+            // Due Date
+            Expanded(
+              flex: 2,
+              child: Text(
+                dueDateStr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: task.isOverdue ? cs.error : cs.onSurfaceVariant,
+                  fontWeight: task.isOverdue ? FontWeight.w600 : null,
+                  fontFeatures: [const FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+
+            // Created
+            Expanded(
+              flex: 2,
+              child: Text(
+                createdStr,
+                textAlign: TextAlign.right,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontFeatures: [const FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusChip(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  // Helpers
+  Color _priorityColor(TaskPriority p, ColorScheme cs) {
+    switch (p) {
+      case TaskPriority.high: return cs.error;
+      case TaskPriority.normal: return cs.primary;
+      case TaskPriority.low: return cs.secondary;
+    }
+  }
 
-    Color backgroundColor;
-    Color textColor;
+  Icon _priorityIcon(TaskPriority p, ColorScheme cs) {
+    switch (p) {
+      case TaskPriority.high: return Icon(Icons.priority_high_rounded, size: 16, color: cs.error);
+      case TaskPriority.normal: return Icon(Icons.low_priority_rounded, size: 16, color: cs.primary);
+      case TaskPriority.low: return Icon(Icons.arrow_downward_rounded, size: 16, color: cs.secondary);
+    }
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final Task task;
+  const _StatusChip({required this.task});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Color bg, fg;
 
     switch (task.status) {
-      case TaskStatus.notStarted:
-        backgroundColor = colorScheme.surfaceVariant;
-        textColor = colorScheme.onSurfaceVariant;
+      case TaskStatus.completed:
+        bg = Colors.green.withOpacity(0.1);
+        fg = Colors.green[700]!;
         break;
       case TaskStatus.inProgress:
-        backgroundColor = colorScheme.primaryContainer;
-        textColor = colorScheme.onPrimaryContainer;
-        break;
-      case TaskStatus.completed:
-        backgroundColor = colorScheme.secondaryContainer;
-        textColor = colorScheme.onSecondaryContainer;
+        bg = Colors.blue.withOpacity(0.1);
+        fg = Colors.blue[700]!;
         break;
       case TaskStatus.cancelled:
-        backgroundColor = colorScheme.errorContainer;
-        textColor = colorScheme.onErrorContainer;
+        bg = cs.surfaceVariant;
+        fg = cs.onSurfaceVariant;
         break;
+      default: // Not Started
+        bg = Colors.orange.withOpacity(0.1);
+        fg = Colors.orange[800]!;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         task.status.value,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.w500,
-        ),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: fg),
       ),
     );
   }
-
-  Widget _buildPriorityIndicator(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    Color color;
-    IconData icon;
-
-    switch (task.priority) {
-      case TaskPriority.high:
-        color = colorScheme.error;
-        icon = Icons.priority_high;
-        break;
-      case TaskPriority.normal:
-        color = colorScheme.primary;
-        icon = Icons.flag;
-        break;
-      case TaskPriority.low:
-        color = colorScheme.onSurfaceVariant;
-        icon = Icons.flag_outlined;
-        break;
-    }
-
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: color,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          task.priority.value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDueDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = date.difference(now).inDays;
-
-    if (difference == 0) {
-      return 'Due today';
-    } else if (difference == 1) {
-      return 'Due tomorrow';
-    } else if (difference == -1) {
-      return 'Due yesterday';
-    } else if (difference > 0) {
-      return 'Due in $difference days';
-    } else {
-      return 'Overdue by ${-difference} days';
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date).inDays;
-
-    if (difference == 0) {
-      return 'Today';
-    } else if (difference == 1) {
-      return 'Yesterday';
-    } else if (difference < 7) {
-      return '$difference days ago';
-    } else {
-      return '${date.month}/${date.day}/${date.year}';
-    }
-  }
 }
-
-/// Arguments for task detail navigation
-class TaskDetailArgs {
-  final String taskId;
-
-  const TaskDetailArgs({required this.taskId});
-
-  @override
-  String toString() => 'TaskDetailArgs(taskId: $taskId)';
-}
-
-  

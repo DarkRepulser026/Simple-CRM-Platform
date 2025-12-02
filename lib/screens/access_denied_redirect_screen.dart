@@ -12,16 +12,21 @@ class _AccessDeniedRedirectScreenState extends State<AccessDeniedRedirectScreen>
   @override
   void initState() {
     super.initState();
+    // Tự động chuyển hướng về Dashboard sau 1 chút
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Access denied — redirecting to dashboard')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Access denied — redirecting to dashboard')),
+      );
       await Future.delayed(const Duration(milliseconds: 800));
-      AppRouter.replaceWith(context, AppRouter.dashboard);
+      if (mounted) {
+        AppRouter.replaceWith(context, AppRouter.dashboard);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Center(child: Text('Redirecting...')),
     );
   }
