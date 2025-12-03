@@ -1,11 +1,4 @@
 import './seed-setup.js';
 
-/* The `seed-setup.js` module calls the helpers and handles running seeding logic. */
-console.log('Seeds completed.');
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+/* The `seed-setup.js` module contains a `main` function that handles the seeding logic
+   and disconnects the Prisma client in a finally block.  Importing the module runs it. */

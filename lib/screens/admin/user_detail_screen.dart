@@ -296,12 +296,13 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                             if (canEdit)
                               FilledButton.icon(
                                 onPressed: () async {
-                                  await AppRouter.navigateTo(
+                                  final res = await AppRouter.navigateTo<bool?>(
                                     context,
                                     AppRouter.adminUserEdit,
                                     arguments: UserDetailArgs(userId: user.id),
                                   );
-                                  _load();
+                                  if (res == true) Navigator.of(context).pop(true);
+                                  else _load();
                                 },
                                 icon: const Icon(
                                   Icons.edit,

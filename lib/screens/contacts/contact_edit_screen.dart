@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../services/contacts_service.dart';
+import '../../services/users_service.dart';
+import '../../models/user.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
@@ -35,12 +37,17 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final result = await showContactEditDialog(
-        context,
-        contactId: widget.contactId,
-      );
-      if (mounted) {
-        Navigator.of(context).pop(result ?? false);
+      try {
+        final result = await showContactEditDialog(
+          context,
+          contactId: widget.contactId,
+        );
+        if (mounted) {
+          Navigator.of(context).pop(result ?? false);
+        }
+      } catch (e, st) {
+        debugPrint('Failed to open ContactEditDialog: $e\n$st');
+        if (mounted) Navigator.of(context).pop(false);
       }
     });
   }
@@ -50,6 +57,8 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
     // Nội dung chính nằm trong dialog
     return const SizedBox.shrink();
   }
+
+  
 }
 
 /// ===================== DIALOG EDIT CONTACT =======================
@@ -65,11 +74,25 @@ class _ContactEditDialog extends StatefulWidget {
 
 class _ContactEditDialogState extends State<_ContactEditDialog> {
   late final ContactsService _contactsService;
+  late final UsersService _usersService;
+  List<User>? _users;
 
   final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _deptCtrl = TextEditingController();
+  final _streetCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  final _postalCodeCtrl = TextEditingController();
+  final _countryCtrl = TextEditingController();
+  final _latitudeCtrl = TextEditingController();
+  final _longitudeCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  String? _selectedOwnerId;
 
   bool _isLoading = true; // load contact
   bool _isSaving = false; // saving state
@@ -80,6 +103,7 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
   void initState() {
     super.initState();
     _contactsService = locator<ContactsService>();
+    _usersService = locator<UsersService>();
     _load();
   }
 
@@ -95,12 +119,37 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
       _firstNameCtrl.text = _contact!.firstName;
       _lastNameCtrl.text = _contact!.lastName;
       _emailCtrl.text = _contact!.email ?? '';
+      _phoneCtrl.text = _contact!.phone ?? '';
+      _titleCtrl.text = _contact!.title ?? '';
+      _deptCtrl.text = _contact!.department ?? '';
+      _streetCtrl.text = _contact!.street ?? '';
+      _cityCtrl.text = _contact!.city ?? '';
+      _stateCtrl.text = _contact!.state ?? '';
+      _postalCodeCtrl.text = _contact!.postalCode ?? '';
+      _countryCtrl.text = _contact!.country ?? '';
+      _latitudeCtrl.text = _contact!.latitude?.toString() ?? '';
+      _longitudeCtrl.text = _contact!.longitude?.toString() ?? '';
+      _descriptionCtrl.text = _contact!.description ?? '';
+      _selectedOwnerId = _contact!.ownerId ?? _contact!.owner?.id;
+        await _loadUsers();
       setState(() => _isLoading = false);
     } else {
+      debugPrint('Failed to load contact ${widget.contactId}: ${res.error.message}');
       setState(() {
         _error = res.error.message;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadUsers() async {
+    final res = await _usersService.getUsers(limit: 200);
+    if (res.isSuccess) {
+      setState(() {
+        _users = res.value.users;
+      });
+    } else {
+        debugPrint('Failed to load users for ContactEdit: ${res.error.message}');
     }
   }
 
@@ -117,20 +166,20 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
       lastName: _lastNameCtrl.text.trim(),
       email:
           _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-      phone: _contact!.phone,
-      title: _contact!.title,
-      department: _contact!.department,
-      street: _contact!.street,
-      city: _contact!.city,
-      state: _contact!.state,
-      postalCode: _contact!.postalCode,
-      country: _contact!.country,
-      latitude: _contact!.latitude,
-      longitude: _contact!.longitude,
-      description: _contact!.description,
+      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      title: _titleCtrl.text.trim().isEmpty ? null : _titleCtrl.text.trim(),
+      department: _deptCtrl.text.trim().isEmpty ? null : _deptCtrl.text.trim(),
+      street: _streetCtrl.text.trim().isEmpty ? null : _streetCtrl.text.trim(),
+      city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+      state: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
+      postalCode: _postalCodeCtrl.text.trim().isEmpty ? null : _postalCodeCtrl.text.trim(),
+      country: _countryCtrl.text.trim().isEmpty ? null : _countryCtrl.text.trim(),
+      latitude: _latitudeCtrl.text.trim().isEmpty ? null : double.tryParse(_latitudeCtrl.text.trim()),
+      longitude: _longitudeCtrl.text.trim().isEmpty ? null : double.tryParse(_longitudeCtrl.text.trim()),
+      description: _descriptionCtrl.text.trim().isEmpty ? null : _descriptionCtrl.text.trim(),
       createdAt: _contact!.createdAt,
       updatedAt: DateTime.now(),
-      ownerId: _contact!.ownerId,
+      ownerId: _selectedOwnerId ?? _contact!.ownerId,
       organizationId: _contact!.organizationId,
     );
 
@@ -297,6 +346,79 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _phoneCtrl,
+                      decoration: const InputDecoration(labelText: 'Phone (optional)'),
+                      keyboardType: TextInputType.phone,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Title (optional)'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(controller: _deptCtrl, decoration: const InputDecoration(labelText: 'Department (optional)')),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(controller: _descriptionCtrl, decoration: const InputDecoration(labelText: 'Short description (optional)')),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: TextFormField(controller: _streetCtrl, decoration: const InputDecoration(labelText: 'Street'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: TextFormField(controller: _cityCtrl, decoration: const InputDecoration(labelText: 'City'))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: TextFormField(controller: _stateCtrl, decoration: const InputDecoration(labelText: 'State'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: TextFormField(controller: _postalCodeCtrl, decoration: const InputDecoration(labelText: 'Postal Code'))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: TextFormField(controller: _countryCtrl, decoration: const InputDecoration(labelText: 'Country'))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Row(children: [
+                    Expanded(child: TextFormField(controller: _latitudeCtrl, decoration: const InputDecoration(labelText: 'Latitude'), keyboardType: TextInputType.number)),
+                    const SizedBox(width: 8),
+                    Expanded(child: TextFormField(controller: _longitudeCtrl, decoration: const InputDecoration(labelText: 'Longitude'), keyboardType: TextInputType.number)),
+                  ])),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                 Expanded(
+                   child: DropdownButtonFormField<String?>(
+                     value: _selectedOwnerId,
+                     decoration: const InputDecoration(labelText: 'Owner'),
+                     items: [
+                       const DropdownMenuItem<String?>(value: null, child: Text('Unassigned')),
+                       ...(_users ?? []).map((u) => DropdownMenuItem<String?>(value: u.id, child: Text(u.name))).toList(),
+                     ],
+                     onChanged: (v) => setState(() => _selectedOwnerId = v),
+                   ),
+                 ),
+              ]),
               const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerLeft,

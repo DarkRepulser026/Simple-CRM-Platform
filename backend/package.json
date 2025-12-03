@@ -12,6 +12,8 @@
     "prisma:seed": "node prisma/seed-setup.js",
     "grant-admin": "node scripts/grant-admin-permissions.js",
     "seed-demo": "node scripts/seed-sample-data.js",
+    "seed-large": "node scripts/seed-large-sample-data.js",
+    "seed-clean": "node scripts/seed-clean.js",
     "server:test": "node scripts/test-start.js",
     "test": "mocha --timeout 20000 \"test/**/*.js\""
   },

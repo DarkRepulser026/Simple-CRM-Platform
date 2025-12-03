@@ -62,6 +62,15 @@ class _TasksListScreenState extends State<TasksListScreen> {
     setState(() => _reloadVersion++);
   }
 
+  Future<void> _navigateToTaskDetail(String taskId) async {
+    final changed = await AppRouter.navigateTo<bool?>(
+      context,
+      AppRouter.taskDetail,
+      arguments: TaskDetailArgs(taskId: taskId),
+    );
+    if (changed == true) _refreshList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = locator<AuthService>();
@@ -224,11 +233,7 @@ class _TasksListScreenState extends State<TasksListScreen> {
                             loadingMessage: 'Loading tasks...',
                             itemBuilder: (context, task, index) => _TaskRow(
                               task: task,
-                              onTap: () => AppRouter.navigateTo(
-                                context,
-                                AppRouter.taskDetail,
-                                arguments: TaskDetailArgs(taskId: task.id),
-                              ),
+                              onTap: () => _navigateToTaskDetail(task.id),
                             ),
                           ),
                         ),

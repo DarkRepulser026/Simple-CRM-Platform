@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/ticket.dart';
 import '../../services/service_locator.dart';
+import '../../navigation/app_router.dart';
+import 'ticket_edit_screen.dart';
 import '../../services/tickets_service.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
@@ -65,11 +67,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           IconButton(
             icon: Icon(Icons.edit_outlined, color: cs.onSurface),
             tooltip: 'Edit Ticket',
-            onPressed: () {
-              // TODO: Navigate to Edit Screen or Show Edit Dialog
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit feature coming soon')),
+            onPressed: () async {
+              final res = await AppRouter.navigateTo<bool?>(
+                context,
+                AppRouter.ticketEdit,
+                arguments: TicketEditArgs(ticketId: widget.ticketId),
               );
+              if (res == true) Navigator.of(context).pop(true);
             },
           ),
           const SizedBox(width: 8),

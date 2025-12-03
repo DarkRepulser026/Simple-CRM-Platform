@@ -43,8 +43,11 @@ class ContactsService {
   /// Get paginated list of contacts
   Future<Result<ContactsResponse, ApiError>> getContacts({
     int page = 1,
-    int limit = 20,
+    int limit = 9,
     String? search,
+    String? ownerId,
+    String? city,
+    String? department,
   }) async {
     // Check authentication
     if (!_authService.isAuthenticated) {
@@ -57,16 +60,30 @@ class ContactsService {
     };
 
     if (search != null && search.isNotEmpty) {
-      queryParams['search'] = search;
+      queryParams['q'] = search;
     }
+    if (ownerId != null && ownerId.isNotEmpty) queryParams['ownerId'] = ownerId;
+    if (city != null && city.isNotEmpty) queryParams['city'] = city;
+    if (department != null && department.isNotEmpty) queryParams['department'] = department;
 
     final uri = Uri.parse(ApiConfig.contacts).replace(queryParameters: queryParams);
 
+    // Support both legacy array response and paginated response { contacts, pagination }
     final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
     if (res.isError) return Result.error(res.error);
-    final jsonList = res.value as List<dynamic>;
-    final contacts = jsonList.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList();
-    return Result.success(ContactsResponse(contacts: contacts));
+    final jsonValue = res.value;
+
+    if (jsonValue is Map<String, dynamic>) {
+      // Parse paginated response
+      return Result.success(ContactsResponse.fromJson(jsonValue));
+    }
+
+    if (jsonValue is List) {
+      final contacts = jsonValue.map((c) => Contact.fromJson(c as Map<String, dynamic>)).toList();
+      return Result.success(ContactsResponse(contacts: contacts));
+    }
+
+    return Result.error(ApiError.unknown('Unexpected response format'));
   }
 
   /// Get a single contact by ID
@@ -151,7 +168,7 @@ class ContactsService {
   Future<Result<ContactsResponse, ApiError>> searchContacts(
     String query, {
     int page = 1,
-    int limit = 20,
+    int limit = 9,
   }) async {
     // Check authentication
     if (!_authService.isAuthenticated) {

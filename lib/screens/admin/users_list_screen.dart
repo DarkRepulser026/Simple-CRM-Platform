@@ -109,15 +109,25 @@ class _UsersListScreenState extends State<UsersListScreen> {
                       child: Row(
                         children: [
                           OutlinedButton.icon(
-                            onPressed: () => AppRouter.navigateTo(
-                                context, AppRouter.adminInvitations),
+                            onPressed: () async {
+                              final res = await AppRouter.navigateTo<bool?>(
+                                context,
+                                AppRouter.adminInvitations,
+                              );
+                              if (res == true) _refreshList();
+                            },
                             icon: const Icon(Icons.mail_outline, size: 18),
                             label: const Text('Invitations'),
                           ),
                           const SizedBox(width: 8),
                           FilledButton.icon(
-                            onPressed: () =>
-                                AppRouter.navigateTo(context, AppRouter.adminInvite),
+                            onPressed: () async {
+                              final res = await AppRouter.navigateTo<bool?>(
+                                context,
+                                AppRouter.adminInvite,
+                              );
+                              if (res == true) _refreshList();
+                            },
                             icon: const Icon(Icons.person_add_alt_1, size: 18),
                             label: const Text('Invite user'),
                           ),
@@ -302,13 +312,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
                               return InkWell(
                                 onTap: () async {
-                                  await AppRouter.navigateTo(
+                                  final res = await AppRouter.navigateTo<bool?>(
                                     context,
                                     AppRouter.adminUserDetail,
-                                    arguments:
-                                        UserDetailArgs(userId: user.id),
+                                    arguments: UserDetailArgs(userId: user.id),
                                   );
-                                  _refreshList();
+                                  if (res == true) _refreshList();
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -408,13 +417,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                                 );
                                               }
                                             } else if (value == 'edit') {
-                                              await AppRouter.navigateTo(
+                                              final res = await AppRouter.navigateTo<bool?>(
                                                 context,
                                                 AppRouter.adminUserEdit,
-                                                arguments: UserDetailArgs(
-                                                    userId: user.id),
+                                                arguments: UserDetailArgs(userId: user.id),
                                               );
-                                              _refreshList();
+                                              if (res == true) _refreshList();
                                             } else if (value == 'remove') {
                                               final confirm =
                                                   await showDialog<bool>(

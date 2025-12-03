@@ -95,6 +95,8 @@ Useful npm scripts are available in `backend/package.json` for migrations and ge
 - `npm run prisma:seed` — runs a seed script (`prisma/seed.js`) to populate initial data
  - `npm run grant-admin -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Grants full admin permissions for an org and assigns the user as admin (dev script)
  - `npm run seed-demo -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Seeds sample accounts, contacts, leads, tasks, and tickets for the organization (dev script)
+ - `npm run seed-large -- ORG_ID=<orgId> ADMIN_EMAIL=<email> [SEED_USERS=100 SEED_CONTACTS=1000 ...]` — Populates large volumes of sample data for pagination and performance testing. Supports env vars for counts: `SEED_USERS`, `SEED_CONTACTS`, `SEED_LEADS`, `SEED_TASKS`, `SEED_TICKETS`, `SEED_TICKET_MESSAGES`, `SEED_ATTACHMENTS`.
+ - `npm run seed-clean -- ORG_ID=<orgId> SEED_CLEAN_CONFIRM=<token> [KEEP_ORG=true]` — Wipes seeded test data for a given organization. This will delete accounts, contacts, leads, tasks, tickets, ticket messages, attachments, activity logs, user roles, invitations, and userOrganization entries for the targeted organization, and optionally delete the organization itself. By default the script keeps the `admin@example.com` user. Requires a safety confirmation token set via `SEED_CLEAN_CONFIRM` (see script output for the exact token). Use `KEEP_ORG=true` to preserve the organization record.
 
 ## Using from other runtimes (e.g., Flutter `lib/`)
 

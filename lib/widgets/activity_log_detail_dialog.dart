@@ -4,6 +4,7 @@ import '../models/activity_log.dart';
 import 'package:flutter/services.dart';
 import '../navigation/app_router.dart';
 import '../screens/accounts/account_detail_screen.dart';
+import '../screens/contacts/contact_detail_screen.dart';
 
 class ActivityLogDetailDialog extends StatelessWidget {
   final ActivityLog activityLog;
@@ -85,19 +86,20 @@ class ActivityLogDetailDialog extends StatelessWidget {
               final entityId = activityLog.entityId!;
               switch (entityType) {
                 case 'Account':
-                  AppRouter.navigateTo(context, AppRouter.accountDetail, arguments: AccountDetailArgs(accountId: entityId));
+                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.accountDetail, arguments: AccountDetailArgs(accountId: entityId));
                   break;
                 case 'Contact':
-                  AppRouter.navigateTo(context, AppRouter.contactDetail, arguments: ContactDetailArgs(contactId: entityId));
+                  // Use the dialog helper which will show the contact dialog reliably
+                  showContactDetailDialog(context, contactId: entityId);
                   break;
                 case 'Lead':
-                  AppRouter.navigateTo(context, AppRouter.leadDetail, arguments: LeadDetailArgs(leadId: entityId));
+                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.leadDetail, arguments: LeadDetailArgs(leadId: entityId));
                   break;
                 case 'Task':
-                  AppRouter.navigateTo(context, AppRouter.taskDetail, arguments: TaskDetailArgs(taskId: entityId));
+                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.taskDetail, arguments: TaskDetailArgs(taskId: entityId));
                   break;
                 case 'Ticket':
-                  AppRouter.navigateTo(context, AppRouter.ticketDetail, arguments: TicketDetailArgs(ticketId: entityId));
+                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.ticketDetail, arguments: TicketDetailArgs(ticketId: entityId));
                   break;
                 default:
                   break;

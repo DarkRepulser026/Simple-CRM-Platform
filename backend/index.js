@@ -300,11 +300,6 @@ const normalizeRoleType = normalizeRoleTypeLib;
 
 // ALLOWED_PERMISSIONS moved to lib/permissions for reuse
 const ALLOWED_PERMISSIONS_LOCAL = ALLOWED_PERMISSIONS;
-  'VIEW_CONTACTS','CREATE_CONTACTS','EDIT_CONTACTS','DELETE_CONTACTS','VIEW_LEADS','CREATE_LEADS','EDIT_LEADS','DELETE_LEADS','CONVERT_LEADS',
-  'VIEW_TICKETS','CREATE_TICKETS','EDIT_TICKETS','DELETE_TICKETS','ASSIGN_TICKETS','RESOLVE_TICKETS',
-  'VIEW_TASKS','CREATE_TASKS','EDIT_TASKS','DELETE_TASKS','ASSIGN_TASKS',
-  'VIEW_DASHBOARD','VIEW_REPORTS','MANAGE_USERS','MANAGE_ROLES','MANAGE_ORGANIZATION','VIEW_AUDIT_LOGS'
-];
 
 const normalizePermissionsArray = (arr) => normalizePermissionsArrayLib(arr);
 
@@ -521,14 +516,54 @@ app.get('/auth/me', authenticateToken, async (req, res) => {
 // Contacts routes
 app.get('/contacts', authenticateToken, requireOrganization, async (req, res) => {
   try {
+    // Parse query params for filtering & pagination
+    const { page, limit, q, ownerId, city, department } = req.query;
+    const _page = parseInt(page) || 1;
+    const _limit = Math.min(parseInt(limit) || 1000, 1000);
+    const skip = (_page - 1) * _limit;
+
+    const where = { organizationId: req.organizationId };
+    // Add optional filters
+    if (ownerId) where.ownerId = ownerId;
+    if (city) where.city = { equals: city };
+    if (department) where.department = { equals: department };
+    if (q) {
+      const qStr = String(q).toLowerCase();
+      // Use OR search across fields
+      where.OR = [
+        { firstName: { contains: qStr, mode: 'insensitive' } },
+        { lastName: { contains: qStr, mode: 'insensitive' } },
+        { email: { contains: qStr, mode: 'insensitive' } },
+        { phone: { contains: qStr, mode: 'insensitive' } },
+        { title: { contains: qStr, mode: 'insensitive' } },
+      ];
+    }
+
+    // Count total matching records for pagination
+    const total = await prisma.contact.count({ where });
+
     const contacts = await prisma.contact.findMany({
-      where: { organizationId: req.organizationId },
+      where,
       include: {
         owner: { select: { id: true, name: true, email: true } },
         organization: { select: { id: true, name: true } }
-      }
+      },
+      skip,
+      take: _limit,
+      orderBy: { createdAt: 'desc' }
     });
-    res.json(contacts);
+
+    const pageNum = _page;
+    const pagination = {
+      page: pageNum,
+      limit: _limit,
+      total,
+      totalPages: Math.ceil(total / _limit),
+      hasNext: pageNum * _limit < total,
+      hasPrev: pageNum > 1,
+    };
+
+    res.json({ contacts, pagination });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

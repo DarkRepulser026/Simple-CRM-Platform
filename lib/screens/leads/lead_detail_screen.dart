@@ -65,12 +65,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               icon: Icon(Icons.edit_outlined, color: cs.onSurface),
               tooltip: 'Edit Lead',
               onPressed: () async {
-                final res = await AppRouter.navigateTo(
+                final res = await AppRouter.navigateTo<bool?>(
                   context,
                   AppRouter.leadEdit,
                   arguments: LeadEditArgs(leadId: widget.leadId),
                 );
-                if (res == true) _refresh();
+                if (res == true) {
+                  Navigator.of(context).pop(true);
+                }
               },
             ),
           ),

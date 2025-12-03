@@ -87,12 +87,16 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           ManagerOrAdminOnly(
             child: IconButton(
               onPressed: () async {
-                final res = await AppRouter.navigateTo(
+                final res = await AppRouter.navigateTo<bool?>(
                   context,
                   AppRouter.accountEdit,
                   arguments: AccountDetailArgs(accountId: _account!.id),
                 );
-                if (res == true) _refresh();
+                if (res == true) {
+                  // Close this detail screen with true to indicate to any parent
+                  // that the account has changed (for the list to refresh).
+                  Navigator.of(context).pop(true);
+                }
               },
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Edit',

@@ -164,11 +164,14 @@ class _TaskDetailCardState extends State<_TaskDetailCard> {
                 tooltip: 'Edit task',
                 icon: const Icon(Icons.edit),
                 onPressed: () {
-                  AppRouter.navigateTo(
-                    context,
-                    AppRouter.taskEdit,
-                    arguments: TaskDetailArgs(taskId: task.id),
-                  );
+                    () async {
+                      final res = await AppRouter.navigateTo<bool?>(
+                        context,
+                        AppRouter.taskEdit,
+                        arguments: TaskDetailArgs(taskId: task.id),
+                      );
+                      if (res == true) Navigator.of(context).pop(true);
+                    }();
                 },
               ),
             ),

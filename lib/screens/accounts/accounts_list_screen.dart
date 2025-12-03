@@ -66,6 +66,15 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
 
   void _refreshList() => setState(() => _reloadVersion++);
 
+  Future<void> _navigateToAccountDetail(String accountId) async {
+    final changed = await AppRouter.navigateTo<bool?>(
+      context,
+      AppRouter.accountDetail,
+      arguments: AccountDetailArgs(accountId: accountId),
+    );
+    if (changed == true) _refreshList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (locator<AuthService>().isLoggedIn && !locator<AuthService>().hasSelectedOrganization) {
@@ -210,11 +219,7 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
                                 loadingMessage: 'Loading accounts...',
                                 itemBuilder: (context, acc, index) => _AccountRow(
                                   account: acc,
-                                  onTap: () => AppRouter.navigateTo(
-                                    context,
-                                    AppRouter.accountDetail,
-                                    arguments: AccountDetailArgs(accountId: acc.id),
-                                  ),
+                                  onTap: () => _navigateToAccountDetail(acc.id),
                                 ),
                               ),
                             ),

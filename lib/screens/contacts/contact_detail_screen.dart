@@ -20,6 +20,7 @@ Future<bool?> showContactDetailDialog(
   return showDialog<bool>(
     context: context,
     barrierDismissible: true,
+    useRootNavigator: true,
     builder: (_) => _ContactDetailDialog(contactId: contactId),
   );
 }
@@ -82,6 +83,7 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
       _isLoading = true;
       _error = null;
     });
+    debugPrint('ContactDetailDialog: loading contact ${widget.contactId}');
     try {
       final res = await _contactsService.getContact(widget.contactId);
       if (res.isSuccess) {
@@ -102,12 +104,18 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
 
   void _goToEdit() async {
     if (_contact == null) return;
-    Navigator.of(context).pop(); // đóng popup
-    await AppRouter.navigateTo(
-      context,
-      AppRouter.contactEdit,
-      arguments: ContactEditArgs(contactId: _contact!.id),
-    );
+    try {
+      final edited = await Navigator.of(context, rootNavigator: true).pushNamed<bool?>(
+        AppRouter.contactEdit,
+        arguments: ContactEditArgs(contactId: _contact!.id),
+      );
+      if (edited == true) {
+        // Close the detail dialog and indicate to caller that the contact changed
+        Navigator.of(context).pop(true);
+      }
+    } catch (e, st) {
+      debugPrint('Navigation to contact edit failed: $e\n$st');
+    }
   }
 
   @override
@@ -229,6 +237,17 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
               ),
             ),
             const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                AppRouter.navigateTo(
+                  context,
+                  AppRouter.activityLogs,
+                  arguments: ActivityLogsArgs(entityType: 'Contact', entityId: c.id),
+                );
+              },
+              tooltip: 'View activity',
+              icon: const Icon(Icons.history, size: 18),
+            ),
             // Action buttons
             ManagerOrAdminOnly(
               child: FilledButton.icon(
@@ -259,45 +278,60 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
           ),
           child: Column(
             children: [
-              Row(
-                children: [
-                  _infoLabel(context, 'Email'),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      c.email ?? '-',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
+              // Title
+              Row(children: [
+                _infoLabel(context, 'Title'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.title ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  _infoLabel(context, 'Phone'),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      c.phone ?? '-',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
+
+              // Department
+              Row(children: [
+                _infoLabel(context, 'Department'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.department ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
               const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _infoLabel(context, 'Address'),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      c.fullAddress,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
+
+              // Email
+              Row(children: [
+                _infoLabel(context, 'Email'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.email ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
+              const SizedBox(height: 10),
+
+              // Phone
+              Row(children: [
+                _infoLabel(context, 'Phone'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.phone ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
+              const SizedBox(height: 10),
+
+              // Address
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _infoLabel(context, 'Address'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.fullAddress, style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
+              const SizedBox(height: 10),
+
+              // Owner
+              Row(children: [
+                _infoLabel(context, 'Owner'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.owner?.name ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
+              const SizedBox(height: 10),
+
+              // Geo
+              Row(children: [
+                _infoLabel(context, 'Geo'),
+                const SizedBox(width: 12),
+                Expanded(child: Text(c.latitude != null && c.longitude != null ? '${c.latitude}, ${c.longitude}' : '-', style: Theme.of(context).textTheme.bodyMedium)),
+              ]),
             ],
           ),
         ),

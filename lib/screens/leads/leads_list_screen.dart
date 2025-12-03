@@ -228,12 +228,13 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     );
   }
 
-  void _navigateToLeadDetail(String leadId) {
-    AppRouter.navigateTo(
+  Future<void> _navigateToLeadDetail(String leadId) async {
+    final changed = await AppRouter.navigateTo<bool?>(
       context,
       AppRouter.leadDetail,
       arguments: LeadDetailArgs(leadId: leadId),
     );
+    if (changed == true) _refreshList();
   }
 }
 

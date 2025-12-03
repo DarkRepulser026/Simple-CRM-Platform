@@ -61,6 +61,15 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
 
   void _refreshList() => setState(() => _reloadVersion++);
 
+  Future<void> _navigateToTicketDetail(String ticketId) async {
+    final changed = await AppRouter.navigateTo<bool?>(
+      context,
+      AppRouter.ticketDetail,
+      arguments: TicketDetailArgs(ticketId: ticketId),
+    );
+    if (changed == true) _refreshList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = locator<AuthService>();
@@ -211,11 +220,7 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                             loadingMessage: 'Loading tickets...',
                             itemBuilder: (context, ticket, index) => _TicketRow(
                               ticket: ticket,
-                              onTap: () => AppRouter.navigateTo(
-                                context, 
-                                AppRouter.ticketDetail, 
-                                arguments: TicketDetailArgs(ticketId: ticket.id)
-                              ),
+                              onTap: () => _navigateToTicketDetail(ticket.id),
                             ),
                           ),
                         ),

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
+import '../../models/pagination.dart';
 import '../../services/auth/auth_service.dart';
 import '../../navigation/app_router.dart';
+import 'contact_detail_screen.dart';
 import '../../models/contact.dart';
 import '../../widgets/error_view.dart';
 import '../../services/contacts_service.dart';
+import '../../services/users_service.dart';
+import '../../models/user.dart';
 import '../../services/service_locator.dart';
 
 /// List screen for displaying and managing contacts with pagination
@@ -17,47 +21,38 @@ class ContactsListScreen extends StatefulWidget {
 
 class _ContactsListScreenState extends State<ContactsListScreen> {
   late final ContactsService _contactsService;
+  late final UsersService _usersService;
   final TextEditingController _searchCtrl = TextEditingController();
+  final TextEditingController _cityCtrl = TextEditingController();
+  final TextEditingController _departmentCtrl = TextEditingController();
+  String? _selectedOwnerId;
   int _reloadVersion = 0; // Dùng để ép reload list khi search/filter
+  List<User>? _users;
 
-  // Hàm lấy dữ liệu cho PaginatedListView
-  Future<List<Contact>> _fetchContactsPage(int page, int limit) async {
-    try {
-      final res = await _contactsService.getContacts(
-        page: page,
-        limit: limit,
-      );
-      
-      if (res.isSuccess) {
-        var contacts = res.value.contacts;
-        
-        // Client-side filtering demo (nếu cần thiết):
-        if (_searchCtrl.text.isNotEmpty) {
-           final q = _searchCtrl.text.toLowerCase();
-           contacts = contacts.where((c) => 
-             c.fullName.toLowerCase().contains(q) || 
-             (c.email ?? '').toLowerCase().contains(q) ||
-             (c.phone ?? '').toLowerCase().contains(q)
-           ).toList();
-        }
-        
-        return contacts;
-      }
-      throw Exception(res.error.message);
-    } catch (e) {
-      throw Exception('Failed to load contacts: $e');
-    }
-  }
+  // server paginated fetch is done inline via fetchPaginated param in the PaginatedListView
 
   @override
   void initState() {
     super.initState();
     _contactsService = locator<ContactsService>();
+    _usersService = locator<UsersService>();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    final res = await _usersService.getUsers(limit: 200);
+    if (res.isSuccess) {
+      setState(() {
+        _users = res.value.users;
+      });
+    }
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _cityCtrl.dispose();
+    _departmentCtrl.dispose();
     super.dispose();
   }
 
@@ -165,11 +160,96 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    
+                    SizedBox(
+                      width: 160,
+                      child: DropdownButtonFormField<String?>(
+                        value: _selectedOwnerId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Owner',
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surface,
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(value: null, child: Text('Any owner')),
+                          ...( _users ?? []).map((u) => DropdownMenuItem<String?>(value: u.id, child: Text(u.name))).toList()
+                        ],
+                        onChanged: (v) => setState(() => _selectedOwnerId = v),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 140,
+                      child: TextField(
+                        controller: _cityCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'City',
+                          filled: true,
+                          fillColor: colorScheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(999),
+                            borderSide: BorderSide(
+                              color: colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                        ),
+                        onSubmitted: (_) => _refreshList(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 160,
+                      child: TextField(
+                        controller: _departmentCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Department',
+                          filled: true,
+                          fillColor: colorScheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(999),
+                            borderSide: BorderSide(
+                              color: colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                        ),
+                        onSubmitted: (_) => _refreshList(),
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: () {
+                        setState(() {
+                          _selectedOwnerId = null;
+                          _cityCtrl.clear();
+                          _departmentCtrl.clear();
+                          _searchCtrl.clear();
+                          _refreshList();
+                        });
+                      },
+                      tooltip: 'Clear filters',
+                      icon: const Icon(Icons.filter_alt_off),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _refreshList,
+                      child: const Text('Apply'),
+                    ),
+                    const SizedBox(width: 12),
                     // New Contact Button
                     FilledButton.icon(
-                      onPressed: () => AppRouter.navigateTo(
-                          context, AppRouter.contactCreate),
+                      onPressed: () async {
+                        final created = await AppRouter.navigateTo<bool?>(
+                          context,
+                          AppRouter.contactCreate,
+                        );
+                        if (created == true) _refreshList();
+                      },
                       icon: const Icon(Icons.person_add_alt_1, size: 18),
                       label: const Text('New contact'),
                       style: FilledButton.styleFrom(
@@ -213,10 +293,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                           child: Row(
                             children: [
                               const SizedBox(width: 48), // Space for Avatar
-                              _headerCell(context, 'Name', flex: 3),
-                              _headerCell(context, 'Email', flex: 3),
-                              _headerCell(context, 'Phone', flex: 2),
-                              _headerCell(context, 'Created',
+                                _headerCell(context, 'Name', flex: 3),
+                                _headerCell(context, 'Email', flex: 2),
+                                _headerCell(context, 'Phone', flex: 2),
+                                _headerCell(context, 'Department', flex: 2),
+                                _headerCell(context, 'Owner', flex: 2),
+                                _headerCell(context, 'Created',
                                   flex: 2, align: TextAlign.right),
                             ],
                           ),
@@ -226,19 +308,27 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                         // TABLE BODY (List)
                         Expanded(
                           child: PaginatedListView<Contact>(
-                            key: ValueKey(_reloadVersion),
-                            fetchPage: _fetchContactsPage,
-                            pageSize: 20,
-                            emptyMessage: 'No contacts found',
-                            errorMessage: 'Failed to load contacts',
-                            loadingMessage: 'Loading contacts...',
-                            itemBuilder: (context, contact, index) =>
-                                _ContactRow(
-                              contact: contact,
-                              onTap: () =>
-                                  _navigateToContactDetail(contact.id),
-                            ),
-                          ),
+                                      key: ValueKey(_reloadVersion),
+                                      fetchPaginated: (page, limit) async {
+                                        final res = await _contactsService.getContacts(
+                                          page: page,
+                                          limit: limit,
+                                          search: _searchCtrl.text.isEmpty ? null : _searchCtrl.text,
+                                          ownerId: _selectedOwnerId,
+                                          city: _cityCtrl.text.isEmpty ? null : _cityCtrl.text,
+                                          department: _departmentCtrl.text.isEmpty ? null : _departmentCtrl.text,
+                                        );
+                                        if (res.isError) throw Exception(res.error.message);
+                                        final contactsResp = res.value;
+                                        final pagination = contactsResp.pagination ?? Pagination(page: page, limit: limit, total: contactsResp.contacts.length, totalPages: 1, hasNext: false, hasPrev: false);
+                                        return PaginatedResponse<Contact>(items: contactsResp.contacts, pagination: pagination);
+                                      },
+                                      pageSize: 9,
+                                      emptyMessage: 'No contacts found',
+                                      errorMessage: 'Failed to load contacts',
+                                      loadingMessage: 'Loading contacts...',
+                                    itemBuilder: (context, contact, index) => _ContactRow(contact: contact, onTap: () => _navigateToContactDetail(contact.id)),
+                                    ),
                         ),
                       ],
                     ),
@@ -252,12 +342,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     );
   }
 
-  void _navigateToContactDetail(String contactId) {
-    AppRouter.navigateTo(
-      context,
-      AppRouter.contactDetail,
-      arguments: ContactDetailArgs(contactId: contactId),
-    );
+  Future<void> _navigateToContactDetail(String contactId) async {
+    // Show the contact detail dialog directly. This ensures the dialog is presented
+    // on top of all overlays and avoids navigator nesting issues from the list view.
+    debugPrint('ContactsListScreen: navigate to contact detail: $contactId');
+    final changed = await showContactDetailDialog(context, contactId: contactId);
+    if (changed == true) _refreshList();
   }
 
   Widget _headerCell(BuildContext context, String label,
@@ -344,7 +434,7 @@ class _ContactRow extends StatelessWidget {
 
             // Email
             Expanded(
-              flex: 3,
+              flex: 2,
               child: Text(
                 contact.email ?? '-',
                 maxLines: 1,
@@ -360,6 +450,32 @@ class _ContactRow extends StatelessWidget {
               flex: 2,
               child: Text(
                 contact.phone ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+
+            // Department
+            Expanded(
+              flex: 2,
+              child: Text(
+                contact.department ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+
+            // Owner
+            Expanded(
+              flex: 2,
+              child: Text(
+                contact.owner?.name ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

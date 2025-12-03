@@ -224,7 +224,11 @@ class AppRouter {
           if (ca != null) {
             return MaterialPageRoute(builder: (context) => ContactEditScreen(contactId: ca.contactId));
           }
-          break;
+          // If args are missing show a helpful error page instead of returning null
+          return MaterialPageRoute(builder: (context) => Scaffold(
+            appBar: AppBar(title: const Text('Edit contact')), 
+            body: Center(child: Text('Missing contact ID for edit route')), 
+          ));
       case leadDetail:
         final args = settings.arguments as LeadDetailArgs?;
         if (args != null) {

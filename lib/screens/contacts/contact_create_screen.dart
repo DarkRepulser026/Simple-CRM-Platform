@@ -3,6 +3,8 @@ import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/contacts_service.dart';
+import '../../services/users_service.dart';
+import '../../models/user.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
@@ -55,11 +57,17 @@ class _ContactCreateDialog extends StatefulWidget {
 
 class _ContactCreateDialogState extends State<_ContactCreateDialog> {
   late final ContactsService _contactsService;
+  late final UsersService _usersService;
 
   final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  // company field removed for now - not used
+  final _titleCtrl = TextEditingController();
+  String? _selectedOwnerId;
+  List<User>? _users;
 
   bool _isLoading = false;
   String? _error;
@@ -68,6 +76,23 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
   void initState() {
     super.initState();
     _contactsService = locator<ContactsService>();
+    _usersService = locator<UsersService>();
+    _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    final res = await _usersService.getUsers(limit: 200);
+    if (res.isSuccess) setState(() => _users = res.value.users);
   }
 
   Future<void> _createContact() async {
@@ -82,9 +107,13 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
       id: '',
       firstName: _firstNameCtrl.text.trim(),
       lastName: _lastNameCtrl.text.trim(),
+      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      title: _titleCtrl.text.trim().isEmpty ? null : _titleCtrl.text.trim(),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       organizationId: locator<AuthService>().selectedOrganizationId ?? '',
+      ownerId: _selectedOwnerId,
       // TODO: Add email/phone... here once supported by the model.
     );
 
@@ -201,6 +230,28 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
                       ),
                       keyboardType: TextInputType.emailAddress,
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: TextFormField(controller: _phoneCtrl, decoration: const InputDecoration(labelText: 'Phone (optional)'), keyboardType: TextInputType.phone)),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextFormField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Title (optional)'))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                       Expanded(
+                         child: DropdownButtonFormField<String?>(
+                           value: _selectedOwnerId,
+                           decoration: const InputDecoration(labelText: 'Owner (optional)'),
+                           items: [
+                             const DropdownMenuItem<String?>(value: null, child: Text('Unassigned')),
+                             ...(_users ?? []).map((u) => DropdownMenuItem<String?>(value: u.id, child: Text(u.name))).toList(),
+                           ],
+                           onChanged: (v) => setState(() => _selectedOwnerId = v),
+                         ),
+                       ),
+                    ]),
                     const SizedBox(height: 4),
                     Align(
                       alignment: Alignment.centerLeft,
