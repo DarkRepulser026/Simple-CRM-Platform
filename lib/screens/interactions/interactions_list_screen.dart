@@ -33,9 +33,7 @@ class _InteractionsListScreenState extends State<InteractionsListScreen> {
     _interactionService = locator<InteractionService>();
   }
 
-  void _refreshList() {
-    setState(() => _reloadVersion++);
-  }
+  // _refreshList is unused; keep reloadVersion state and expose refresh capability via other UI actions
 
   @override
   Widget build(BuildContext context) {

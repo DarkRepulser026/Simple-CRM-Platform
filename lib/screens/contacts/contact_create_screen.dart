@@ -5,7 +5,6 @@ import '../../services/auth/auth_service.dart';
 import '../../services/contacts_service.dart';
 import '../../services/users_service.dart';
 import '../../models/user.dart';
-import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
 /// === Public API =============================================================

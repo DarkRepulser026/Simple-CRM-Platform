@@ -5,7 +5,6 @@ import '../../services/service_locator.dart';
 import '../../services/organizations_service.dart';
 import '../../navigation/app_router.dart';
 import '../../services/auth/auth_service.dart';
-import '../../widgets/error_view.dart';
 
 class OrganizationsListScreen extends StatefulWidget {
   const OrganizationsListScreen({super.key});

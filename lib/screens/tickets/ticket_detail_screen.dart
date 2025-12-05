@@ -477,3 +477,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour}:${date.minute}";
   }
 }
+
+/// Dialog helper to show ticket detail as modal. Keeps consistent look with TicketDetailScreen content.
+Future<bool?> showTicketDetailDialog(BuildContext context, {required String ticketId}) {
+  return showDialog<bool>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(child: TicketDetailScreen(ticketId: ticketId)),
+        ),
+      ),
+    ),
+  );
+}

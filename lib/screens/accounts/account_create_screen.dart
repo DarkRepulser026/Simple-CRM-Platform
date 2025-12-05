@@ -4,7 +4,6 @@ import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/accounts_service.dart';
 import '../../services/api/api_exceptions.dart';
-import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
 class AccountCreateScreen extends StatefulWidget {

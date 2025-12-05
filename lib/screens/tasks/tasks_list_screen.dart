@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/task.dart';
 import '../../navigation/app_router.dart';
+import 'task_detail_screen.dart';
 import '../../services/auth/auth_service.dart';
 import '../../widgets/error_view.dart';
 import '../../services/tasks_service.dart';
@@ -63,12 +64,9 @@ class _TasksListScreenState extends State<TasksListScreen> {
   }
 
   Future<void> _navigateToTaskDetail(String taskId) async {
-    final changed = await AppRouter.navigateTo<bool?>(
-      context,
-      AppRouter.taskDetail,
-      arguments: TaskDetailArgs(taskId: taskId),
-    );
-    if (changed == true) _refreshList();
+    debugPrint('TasksListScreen: open task dialog $taskId');
+    await showTaskDetailDialog(context, taskId);
+    _refreshList();
   }
 
   @override

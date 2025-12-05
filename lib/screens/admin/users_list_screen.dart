@@ -4,6 +4,7 @@ import '../../models/user.dart';
 import '../../services/service_locator.dart';
 import '../../services/users_service.dart';
 import '../../navigation/app_router.dart';
+import 'user_detail_screen.dart' as user_detail;
 import '../../widgets/role_visibility.dart';
 import '../../services/auth/auth_service.dart';
 
@@ -312,11 +313,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
                               return InkWell(
                                 onTap: () async {
-                                  final res = await AppRouter.navigateTo<bool?>(
-                                    context,
-                                    AppRouter.adminUserDetail,
-                                    arguments: UserDetailArgs(userId: user.id),
-                                  );
+                                  final res = await user_detail.showAdminUserDetailDialog(context, userId: user.id);
                                   if (res == true) _refreshList();
                                 },
                                 child: Container(
@@ -552,7 +549,6 @@ class _UsersListScreenState extends State<UsersListScreen> {
   }
 
   Widget _buildStatusChip(BuildContext context, bool isActive) {
-    final colorScheme = Theme.of(context).colorScheme;
     final color = isActive ? Colors.green : Colors.red;
     final bg = isActive ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08);
 

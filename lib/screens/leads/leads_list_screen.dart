@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/lead.dart';
 import '../../navigation/app_router.dart';
+import 'lead_detail_screen.dart' as lead_detail;
 import '../../services/leads_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
@@ -229,11 +230,8 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   }
 
   Future<void> _navigateToLeadDetail(String leadId) async {
-    final changed = await AppRouter.navigateTo<bool?>(
-      context,
-      AppRouter.leadDetail,
-      arguments: LeadDetailArgs(leadId: leadId),
-    );
+    debugPrint('LeadsListScreen: open lead dialog $leadId');
+    final changed = await lead_detail.showLeadDetailDialog(context, leadId: leadId);
     if (changed == true) _refreshList();
   }
 }
@@ -241,8 +239,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 class _HeaderCell extends StatelessWidget {
   final String label;
   final int flex;
-  final TextAlign align;
-  const _HeaderCell(this.label, {this.flex = 1, this.align = TextAlign.left});
+  const _HeaderCell(this.label, {this.flex = 1});
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +247,6 @@ class _HeaderCell extends StatelessWidget {
       flex: flex,
       child: Text(
         label,
-        textAlign: align,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w600,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -377,7 +373,6 @@ class _StatusChip extends StatelessWidget {
       case LeadStatus.unqualified:
         bg = Colors.grey.withOpacity(0.1); fg = Colors.grey.shade700; break;
       case LeadStatus.pending: // Fallback
-      default:
         bg = Colors.orange.withOpacity(0.1); fg = Colors.orange.shade800;
     }
 

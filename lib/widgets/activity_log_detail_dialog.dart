@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/activity_log.dart';
 import 'package:flutter/services.dart';
-import '../navigation/app_router.dart';
 import '../screens/accounts/account_detail_screen.dart';
 import '../screens/contacts/contact_detail_screen.dart';
+import '../screens/leads/lead_detail_screen.dart' as lead_detail;
+import '../screens/tasks/task_detail_screen.dart';
+import '../screens/tickets/ticket_detail_screen.dart';
 
 class ActivityLogDetailDialog extends StatelessWidget {
   final ActivityLog activityLog;
@@ -86,20 +88,22 @@ class ActivityLogDetailDialog extends StatelessWidget {
               final entityId = activityLog.entityId!;
               switch (entityType) {
                 case 'Account':
-                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.accountDetail, arguments: AccountDetailArgs(accountId: entityId));
+                  showAccountDetailDialog(context, accountId: entityId);
                   break;
                 case 'Contact':
                   // Use the dialog helper which will show the contact dialog reliably
                   showContactDetailDialog(context, contactId: entityId);
                   break;
                 case 'Lead':
-                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.leadDetail, arguments: LeadDetailArgs(leadId: entityId));
+                  // Use the lead dialog helper to show the lead details reliably
+                  lead_detail.showLeadDetailDialog(context, leadId: entityId);
                   break;
                 case 'Task':
-                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.taskDetail, arguments: TaskDetailArgs(taskId: entityId));
+                  // Use the existing helper to show task detail as dialog
+                  showTaskDetailDialog(context, entityId);
                   break;
                 case 'Ticket':
-                  Navigator.of(context, rootNavigator: true).pushNamed(AppRouter.ticketDetail, arguments: TicketDetailArgs(ticketId: entityId));
+                  showTicketDetailDialog(context, ticketId: entityId);
                   break;
                 default:
                   break;

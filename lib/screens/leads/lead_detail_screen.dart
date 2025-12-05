@@ -22,26 +22,9 @@ class LeadDetailScreen extends StatefulWidget {
 }
 
 class _LeadDetailScreenState extends State<LeadDetailScreen> {
-  late final LeadsService _leadsService;
-  late Future<Lead> _futureLead;
-
   @override
   void initState() {
     super.initState();
-    _leadsService = locator<LeadsService>();
-    _futureLead = _fetchLead();
-  }
-
-  Future<Lead> _fetchLead() async {
-    final res = await _leadsService.getLead(widget.leadId);
-    if (res.isSuccess) return res.value;
-    throw Exception(res.error.message);
-  }
-
-  void _refresh() {
-    setState(() {
-      _futureLead = _fetchLead();
-    });
   }
 
   @override
@@ -79,45 +62,103 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: FutureBuilder<Lead>(
-        future: _futureLead,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const LoadingView(message: 'Loading lead details...');
-          }
-          if (snapshot.hasError) {
-            return ErrorView(
-              message: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: Text('Lead not found'));
-          }
-
-          final lead = snapshot.data!;
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context, lead),
-                    const SizedBox(height: 24),
-                    _buildContentLayout(context, lead),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: LeadDetailCard(leadId: widget.leadId),
+          ),
+        ),
       ),
     );
   }
 
+
+}
+
+/// Dialog helper to show lead details in a modal dialog
+Future<bool?> showLeadDetailDialog(BuildContext context, {required String leadId}) {
+  return showDialog<bool>(
+    context: context,
+    useRootNavigator: true,
+    builder: (_) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(child: LeadDetailCard(leadId: leadId)),
+        ),
+      ),
+    ),
+  );
+}
+class LeadDetailCard extends StatefulWidget {
+  final String leadId;
+  const LeadDetailCard({required this.leadId});
+
+  @override
+  State<LeadDetailCard> createState() => _LeadDetailCardState();
+}
+
+class _LeadDetailCardState extends State<LeadDetailCard> {
+  late final LeadsService _leadsService;
+  bool _isLoading = true;
+  String? _error;
+  Lead? _lead;
+
+  @override
+  void initState() {
+    super.initState();
+    _leadsService = locator<LeadsService>();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final res = await _leadsService.getLead(widget.leadId);
+      if (res.isSuccess) {
+        setState(() {
+          _lead = res.value;
+          _isLoading = false;
+        });
+        return;
+      }
+      throw Exception(res.error.message);
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load lead: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _refresh() => _load();
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const LoadingView(message: 'Loading lead details...');
+    if (_error != null) return ErrorView(message: _error!, onRetry: _refresh);
+    if (_lead == null) return const Center(child: Text('Lead not found'));
+
+    final lead = _lead!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context, lead),
+        const SizedBox(height: 24),
+        _buildContentLayout(context, lead),
+      ],
+    );
+  }
+}
   // --- HEADER: Avatar + Name + Actions ---
   Widget _buildHeader(BuildContext context, Lead lead) {
     final theme = Theme.of(context);
@@ -358,4 +399,3 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       ),
     );
   }
-}

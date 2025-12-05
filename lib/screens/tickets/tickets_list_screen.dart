@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/ticket.dart';
 import '../../navigation/app_router.dart';
+import 'ticket_detail_screen.dart';
 import '../../services/auth/auth_service.dart';
 import '../../widgets/error_view.dart';
 import '../../services/tickets_service.dart';
@@ -62,11 +63,8 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
   void _refreshList() => setState(() => _reloadVersion++);
 
   Future<void> _navigateToTicketDetail(String ticketId) async {
-    final changed = await AppRouter.navigateTo<bool?>(
-      context,
-      AppRouter.ticketDetail,
-      arguments: TicketDetailArgs(ticketId: ticketId),
-    );
+    debugPrint('TicketsListScreen: open ticket dialog $ticketId');
+    final changed = await showTicketDetailDialog(context, ticketId: ticketId);
     if (changed == true) _refreshList();
   }
 

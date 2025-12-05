@@ -350,12 +350,12 @@ class _RolesListScreenState extends State<RolesListScreen> {
           );
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete role: ${res.error?.message}'),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to delete role: ${res.error.message}'),
+              ),
+            );
         }
       }
     }
@@ -535,7 +535,7 @@ class _RolesListScreenState extends State<RolesListScreen> {
                                        ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text(
-                                            'Failed to ${isNew ? 'create' : 'update'} role: ${res.error?.message}',
+                                            'Failed to ${isNew ? 'create' : 'update'} role: ${res.error.message}',
                                           ),
                                         ),
                                       );

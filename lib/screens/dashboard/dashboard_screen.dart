@@ -12,6 +12,7 @@ import '../../models/user_role.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../navigation/app_router.dart';
+import '../admin/user_detail_screen.dart' as user_detail;
 import 'admin_metrics_grid.dart';
 import '../../widgets/role_visibility.dart';
 
@@ -370,11 +371,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _showUserDialog(context, user: u), // Shortcut edit
                       ),
                     ),
-                    onTap: () => AppRouter.navigateTo(
-                      context,
-                      AppRouter.adminUserDetail,
-                      arguments: UserDetailArgs(userId: u.id),
-                    ),
+                    onTap: () async {
+                      final res = await user_detail.showAdminUserDetailDialog(context, userId: u.id);
+                      if (res == true) _loadDashboard();
+                    },
                   ),
                   if (u != users.last) const Divider(height: 8, thickness: 0.5),
                 ],
@@ -542,7 +542,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSidebar(
       {required bool showLogout, required bool showImpersonation}) {
-    final colorScheme = Theme.of(context).colorScheme;
     final items = <Widget>[
       Row(
         children: [
@@ -751,8 +750,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isNew = role == null;
     final nameCtrl = TextEditingController(text: role?.name ?? '');
     final descCtrl = TextEditingController(text: role?.description ?? '');
-    UserRoleType currentType = role?.roleType ?? UserRoleType.viewer;
-    Set<Permission> selected = role != null ? role.permissions.toSet() : {};
+    // UserRoleType and selected permissions not currently used in this dialog
     final formKey = GlobalKey<FormState>();
 
     await showDialog<void>(

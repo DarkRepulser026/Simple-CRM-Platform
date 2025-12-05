@@ -67,11 +67,8 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
   void _refreshList() => setState(() => _reloadVersion++);
 
   Future<void> _navigateToAccountDetail(String accountId) async {
-    final changed = await AppRouter.navigateTo<bool?>(
-      context,
-      AppRouter.accountDetail,
-      arguments: AccountDetailArgs(accountId: accountId),
-    );
+    debugPrint('AccountsListScreen: open account dialog $accountId');
+    final changed = await showAccountDetailDialog(context, accountId: accountId);
     if (changed == true) _refreshList();
   }
 

@@ -3,7 +3,6 @@ import '../../models/lead.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/leads_service.dart';
-import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
 class LeadCreateScreen extends StatefulWidget {
