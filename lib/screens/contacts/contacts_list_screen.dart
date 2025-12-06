@@ -4,6 +4,7 @@ import '../../models/pagination.dart';
 import '../../services/auth/auth_service.dart';
 import '../../navigation/app_router.dart';
 import 'contact_detail_screen.dart';
+import 'contact_create_screen.dart' show showCreateContactDialog;
 import '../../models/contact.dart';
 import '../../widgets/error_view.dart';
 import '../../services/contacts_service.dart';
@@ -244,10 +245,8 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
                     // New Contact Button
                     FilledButton.icon(
                       onPressed: () async {
-                        final created = await AppRouter.navigateTo<bool?>(
-                          context,
-                          AppRouter.contactCreate,
-                        );
+                        debugPrint('ContactsListScreen: New contact pressed');
+                        final created = await showCreateContactDialog(context);
                         if (created == true) _refreshList();
                       },
                       icon: const Icon(Icons.person_add_alt_1, size: 18),

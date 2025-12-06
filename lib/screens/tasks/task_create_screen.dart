@@ -14,10 +14,10 @@ class TaskCreateScreen extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6), // Nền xám nhạt dashboard
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Create Task'),
-        backgroundColor: const Color(0xFFF3F4F6),
+        title: const Text('Create New Task'),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.close, color: cs.onSurface),
@@ -26,20 +26,21 @@ class TaskCreateScreen extends StatelessWidget {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
             child: Card(
-              elevation: 4,
-              shadowColor: Colors.black.withOpacity(0.1),
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(16),
               ),
-              color: cs.surface,
-              child: _TaskForm(
-                onDone: (created) {
-                  Navigator.of(context).pop(created);
-                },
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: _TaskForm(
+                  onDone: (created) {
+                    Navigator.of(context).pop(created);
+                  },
+                ),
               ),
             ),
           ),
@@ -163,77 +164,46 @@ class _TaskFormState extends State<_TaskForm> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // Helper decoration cho các input field
-    final inputDecoration = InputDecoration(
-      filled: true,
-      fillColor: cs.surfaceVariant.withOpacity(0.3), // Màu nền nhẹ cho input
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.primary, width: 1.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    );
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ===== HEADER =====
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'New Task',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Add a new item to your workspace',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              IconButton(
-                onPressed: () => widget.onDone(false),
-                icon: Icon(Icons.close, color: cs.onSurfaceVariant),
-                tooltip: 'Close',
-              ),
-            ],
+          Text(
+            'Create New Task',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          
+          const SizedBox(height: 4),
+          Text(
+            'Add a new task to your workspace',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+
           const SizedBox(height: 24),
 
+          // ===== ERROR MESSAGE =====
           if (_error != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: cs.errorContainer.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: cs.error, size: 20),
+                  Icon(Icons.error_outline, color: cs.onErrorContainer, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(_error!, style: TextStyle(color: cs.onSurface)),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: cs.onErrorContainer, fontSize: 13),
+                    ),
                   ),
                 ],
               ),
@@ -249,10 +219,25 @@ class _TaskFormState extends State<_TaskForm> {
                 // Subject Field
                 TextFormField(
                   controller: _subjectCtrl,
-                  decoration: inputDecoration.copyWith(
-                    labelText: 'Subject',
+                  decoration: InputDecoration(
+                    labelText: 'Subject *',
                     hintText: 'e.g. Review Q3 Reports',
-                    prefixIcon: Icon(Icons.check_circle_outline, color: cs.primary),
+                    prefixIcon: Icon(Icons.task_alt_outlined, color: cs.primary),
+                    filled: true,
+                    fillColor: cs.surfaceVariant.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: cs.primary, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'Subject is required'
@@ -264,55 +249,67 @@ class _TaskFormState extends State<_TaskForm> {
                 // Description Field
                 TextFormField(
                   controller: _descriptionCtrl,
-                  decoration: inputDecoration.copyWith(
+                  decoration: InputDecoration(
                     labelText: 'Description',
                     hintText: 'Add details here...',
-                    prefixIcon: Icon(Icons.notes, color: cs.onSurfaceVariant),
-                    alignLabelWithHint: true, // Căn label lên trên cho text area
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Icon(Icons.description_outlined, color: cs.onSurfaceVariant),
+                    ),
+                    filled: true,
+                    fillColor: cs.surfaceVariant.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: cs.primary, width: 2),
+                    ),
+                    alignLabelWithHint: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
-                  maxLines: 4,
+                  maxLines: 3,
                   minLines: 2,
                 ),
                 const SizedBox(height: 16),
 
                 // Priority & Due Date Row
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Priority Dropdown
                     Expanded(
-                      flex: 4,
+                      flex: 1,
                       child: DropdownButtonFormField<TaskPriority>(
                         value: _priority,
-                        decoration: inputDecoration.copyWith(
+                        decoration: InputDecoration(
                           labelText: 'Priority',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          prefixIcon: Icon(Icons.flag_outlined, color: cs.primary),
+                          filled: true,
+                          fillColor: cs.surfaceVariant.withOpacity(0.3),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.primary, width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                         ),
                         items: TaskPriority.values.map((p) {
-                          Color pColor;
-                          IconData pIcon;
-                          switch(p) {
-                            case TaskPriority.high:
-                              pColor = cs.error;
-                              pIcon = Icons.priority_high;
-                              break;
-                            case TaskPriority.low:
-                              pColor = Colors.green;
-                              pIcon = Icons.low_priority;
-                              break;
-                            default: 
-                              pColor = Colors.orange;
-                              pIcon = Icons.flag;
-                          }
+                          final pColor = _getPriorityColor(p, cs);
                           return DropdownMenuItem(
                             value: p,
-                            child: Row(
-                              children: [
-                                Icon(pIcon, size: 16, color: pColor),
-                                const SizedBox(width: 8),
-                                Text(p.value),
-                              ],
-                            ),
+                            child: Text(p.value, style: TextStyle(color: pColor)),
                           );
                         }).toList(),
                         onChanged: (v) {
@@ -320,32 +317,45 @@ class _TaskFormState extends State<_TaskForm> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    
+                    const SizedBox(width: 12),
+
                     // Due Date Picker
                     Expanded(
-                      flex: 5,
+                      flex: 1,
                       child: InkWell(
                         onTap: _pickDueDate,
                         borderRadius: BorderRadius.circular(12),
                         child: InputDecorator(
-                          decoration: inputDecoration.copyWith(
+                          decoration: InputDecoration(
                             labelText: 'Due Date',
-                            suffixIcon: _dueDate != null 
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () => setState(() => _dueDate = null),
-                                ) 
-                              : const Icon(Icons.calendar_today, size: 18),
+                            prefixIcon: Icon(Icons.calendar_today, color: cs.primary),
+                            suffixIcon: _dueDate != null
+                                ? IconButton(
+                                    onPressed: () => setState(() => _dueDate = null),
+                                    icon: Icon(Icons.clear, size: 18, color: cs.onSurfaceVariant),
+                                    padding: EdgeInsets.zero,
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: cs.surfaceVariant.withOpacity(0.3),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                           child: Text(
                             _dueDate == null
-                                ? 'Set date'
+                                ? 'Select date'
                                 : '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year}',
                             style: TextStyle(
-                              color: _dueDate == null 
-                                ? cs.onSurfaceVariant.withOpacity(0.7) 
-                                : cs.onSurface,
+                              color: _dueDate == null
+                                  ? cs.onSurfaceVariant
+                                  : cs.onSurface,
                             ),
                           ),
                         ),
@@ -357,34 +367,29 @@ class _TaskFormState extends State<_TaskForm> {
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
 
-          // ===== ACTIONS =====
+          // ===== ACTION BUTTONS =====
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
                 onPressed: _isLoading ? null : () => widget.onDone(false),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
                 child: const Text('Cancel'),
               ),
               const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: _isLoading ? null : _createTask,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: _isLoading 
-                  ? const SizedBox(
-                      width: 18, height: 18, 
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-                    )
-                  : const Icon(Icons.check),
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check),
                 label: Text(_isLoading ? 'Creating...' : 'Create Task'),
               ),
             ],
@@ -392,5 +397,16 @@ class _TaskFormState extends State<_TaskForm> {
         ],
       ),
     );
+  }
+
+  Color _getPriorityColor(TaskPriority priority, ColorScheme cs) {
+    switch (priority) {
+      case TaskPriority.high:
+        return Colors.red[600]!;
+      case TaskPriority.normal:
+        return cs.primary;
+      case TaskPriority.low:
+        return Colors.amber[600]!;
+    }
   }
 }

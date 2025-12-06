@@ -27,7 +27,6 @@ class DashboardMetrics {
   final int ticketsResolvedThisWeek;
   final int tasksCompletedThisWeek;
   final List<ActivityLog> recentActivities;
-  final String systemHealth;
   final double ticketLoad;
   final int activeUsersThisWeek;
 
@@ -67,7 +66,6 @@ class DashboardMetrics {
     required this.ticketsResolvedThisWeek,
     required this.tasksCompletedThisWeek,
     required this.recentActivities,
-    required this.systemHealth,
     required this.ticketLoad,
     required this.activeUsersThisWeek,
     required this.averageCsat,
@@ -126,7 +124,6 @@ class DashboardMetrics {
       ticketsResolvedThisWeek: (json['weeklyMetrics'] != null ? (json['weeklyMetrics']['ticketsResolvedThisWeek'] as int?) : null) ?? 0,
       tasksCompletedThisWeek: (json['weeklyMetrics'] != null ? ((json['weeklyMetrics']['tasksCompletedByAgent'] as Map<String, dynamic>?)?.values.fold<int>(0, (a,b) => a + (b as int? ?? 0)) ) : 0) ?? 0,
       recentActivities: recentActivitiesList,
-      systemHealth: (json['systemHealth'] != null ? (json['systemHealth']['dbConnected'] == true ? 'ok' : 'degraded') : 'unknown'),
       ticketLoad: (json['ticketLoad'] is num) ? (json['ticketLoad'] as num).toDouble() : 0.0,
       activeUsersThisWeek: (json['activeUsersThisWeek'] as int?) ?? 0,
       totalOrganizations: (json['organizationsCount'] as int?) ?? 0,
@@ -158,7 +155,6 @@ class DashboardMetrics {
       'ticketsByAgent': ticketsByAgent,
       'ticketsByPriority': ticketsByPriority,
       'organizationsCount': totalOrganizations,
-      'systemHealth': { 'dbConnected': systemHealth == 'ok' },
       'ticketLoad': ticketLoad,
       'activeUsersThisWeek': activeUsersThisWeek,
       'averageCsat': averageCsat,

@@ -219,8 +219,11 @@ class _PaginatedListViewState<T> extends State<PaginatedListView<T>> {
       child: ListView.separated(
         controller: widget.scrollController,
         padding: widget.padding,
-        itemCount: _items.length + (_hasNextPage ? 1 : 0) + (_error != null && _items.isNotEmpty ? 1 : 0),
+        itemCount: _items.length + (_useServerPagination ? 1 : (_hasNextPage ? 1 : 0)) + (_error != null && _items.isNotEmpty ? 1 : 0),
         separatorBuilder: widget.separatorBuilder ?? (_, __) => const SizedBox(height: 8),
+        addRepaintBoundaries: true,
+        addSemanticIndexes: false,
+        cacheExtent: 500,
         itemBuilder: (context, index) {
           // Error banner at the top if there's an error and we have items
           if (_error != null && _items.isNotEmpty && index == 0) {
@@ -244,7 +247,7 @@ class _PaginatedListViewState<T> extends State<PaginatedListView<T>> {
                 child: Center(child: CircularProgressIndicator()),
               );
             }
-            // If using server pagination, show pager controls
+            // If using server pagination, show pager controls (always visible)
             if (_useServerPagination) {
               return SizedBox(
                 height: 60,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/lead.dart';
+import '../../models/pagination.dart';
 import '../../navigation/app_router.dart';
 import 'lead_detail_screen.dart' as lead_detail;
 import '../../services/leads_service.dart';
@@ -33,27 +34,28 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     super.dispose();
   }
 
-  Future<List<Lead>> _fetchLeadsPage(int page, int limit) async {
+  Future<PaginatedResponse<Lead>> _fetchLeadsPaginated(int page, int limit) async {
     try {
       final res = await _leadsService.getLeads(
         page: page,
         limit: limit,
-        // search: _searchCtrl.text // Uncomment if API supports search
+        search: _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
       );
       if (res.isSuccess) {
-        var leads = res.value.leads;
-        
-        // Filter local demo
-        if (_searchCtrl.text.isNotEmpty) {
-          final q = _searchCtrl.text.toLowerCase();
-          leads = leads.where((l) => 
-            l.fullName.toLowerCase().contains(q) || 
-            (l.company ?? '').toLowerCase().contains(q) ||
-            (l.email ?? '').toLowerCase().contains(q)
-          ).toList();
-        }
-        
-        return leads;
+        final leadsResp = res.value;
+        final pagination = leadsResp.pagination ?? 
+            Pagination(
+              page: page,
+              limit: limit,
+              total: leadsResp.leads.length,
+              totalPages: 1,
+              hasNext: false,
+              hasPrev: false,
+            );
+        return PaginatedResponse<Lead>(
+          items: leadsResp.leads,
+          pagination: pagination,
+        );
       }
       throw Exception(res.error.message);
     } catch (e) {
@@ -206,8 +208,8 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                         Expanded(
                           child: PaginatedListView<Lead>(
                             key: ValueKey(_reloadVersion),
-                            fetchPage: _fetchLeadsPage,
-                            pageSize: 20,
+                            fetchPaginated: _fetchLeadsPaginated,
+                            pageSize: 9,
                             emptyMessage: 'No leads found',
                             errorMessage: 'Failed to load leads',
                             loadingMessage: 'Loading leads...',

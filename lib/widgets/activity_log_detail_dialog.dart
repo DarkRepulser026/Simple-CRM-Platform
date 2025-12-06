@@ -81,7 +81,7 @@ class ActivityLogDetailDialog extends StatelessWidget {
       actions: [
         if (activityLog.entityType != null && activityLog.entityId != null)
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
               // navigate to entity detail based on type
               final entityType = activityLog.entityType;
@@ -106,7 +106,9 @@ class ActivityLogDetailDialog extends StatelessWidget {
                   showTicketDetailDialog(context, ticketId: entityId);
                   break;
                 default:
-                  break;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cannot open this entity type')),
+                  );
               }
             },
             child: const Text('Open Entity'),

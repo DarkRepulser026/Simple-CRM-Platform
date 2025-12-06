@@ -11,12 +11,15 @@ import '../../widgets/error_view.dart';
 /// Dùng ở bất cứ đâu (ví dụ từ ContactsListScreen) nếu muốn show popup trực tiếp:
 ///   final created = await showCreateContactDialog(context);
 Future<bool?> showCreateContactDialog(BuildContext context) {
+  debugPrint('showCreateContactDialog: request');
   return showDialog<bool>(
     context: context,
+    useRootNavigator: true,
     barrierDismissible: false,
     builder: (_) => const _ContactCreateDialog(),
   );
 }
+
 
 class ContactCreateScreen extends StatefulWidget {
   const ContactCreateScreen({super.key});
@@ -33,7 +36,7 @@ class _ContactCreateScreenState extends State<ContactCreateScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final result = await showCreateContactDialog(context);
       if (mounted) {
-        Navigator.of(context).pop(result ?? false);
+        Navigator.of(context, rootNavigator: true).pop(result ?? false);
       }
     });
   }
@@ -77,6 +80,7 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
     _contactsService = locator<ContactsService>();
     _usersService = locator<UsersService>();
     _loadUsers();
+    debugPrint('ContactCreateDialog opened');
   }
 
   @override

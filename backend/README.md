@@ -92,11 +92,24 @@ Useful npm scripts are available in `backend/package.json` for migrations and ge
 - `npm run prisma:migrate` — applies migrations and updates the schema
 - `npm run prisma:generate` — generates the Prisma Client
 - `npm run prisma:studio` — launches Prisma Studio
-- `npm run prisma:seed` — runs a seed script (`prisma/seed.js`) to populate initial data
+- `npm run prisma:seed` — runs a seed script (`prisma/seed.js`) to populate initial data and creates debug test accounts
  - `npm run grant-admin -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Grants full admin permissions for an org and assigns the user as admin (dev script)
  - `npm run seed-demo -- ORG_ID=<orgId> ADMIN_EMAIL=<email>` — Seeds sample accounts, contacts, leads, tasks, and tickets for the organization (dev script)
- - `npm run seed-large -- ORG_ID=<orgId> ADMIN_EMAIL=<email> [SEED_USERS=100 SEED_CONTACTS=1000 ...]` — Populates large volumes of sample data for pagination and performance testing. Supports env vars for counts: `SEED_USERS`, `SEED_CONTACTS`, `SEED_LEADS`, `SEED_TASKS`, `SEED_TICKETS`, `SEED_TICKET_MESSAGES`, `SEED_ATTACHMENTS`.
+ - `npm run seed-large -- ORG_ID=<orgId> ADMIN_EMAIL=<email> [SEED_USERS=100 SEED_CONTACTS=1000 ...]` — Populates large volumes of sample data for pagination and performance testing. Supports env vars for counts: `SEED_USERS`, `SEED_CONTACTS`, `SEED_LEADS`, `SEED_TASKS`, `SEED_TICKETS`, `SEED_TICKET_MESSAGES`, `SEED_ATTACHMENTS`. Also creates test debug accounts.
  - `npm run seed-clean -- ORG_ID=<orgId> SEED_CLEAN_CONFIRM=<token> [KEEP_ORG=true]` — Wipes seeded test data for a given organization. This will delete accounts, contacts, leads, tasks, tickets, ticket messages, attachments, activity logs, user roles, invitations, and userOrganization entries for the targeted organization, and optionally delete the organization itself. By default the script keeps the `admin@example.com` user. Requires a safety confirmation token set via `SEED_CLEAN_CONFIRM` (see script output for the exact token). Use `KEEP_ORG=true` to preserve the organization record.
+
+### Debug Test Accounts
+
+When you run `npm run prisma:seed` or `npm run seed-large`, the following test accounts are automatically created with full permissions:
+
+| Email | Password | Role | Permissions |
+|-------|----------|------|-------------|
+| `admin@example.com` | (mocked auth) | ADMIN | All permissions (26 total) |
+| `manager@example.com` | (mocked auth) | MANAGER | Most permissions except org management (22 total) |
+| `agent@example.com` | (mocked auth) | AGENT | Limited to daily operations (17 total) |
+| `user@example.com` | (mocked auth) | VIEWER | Read-only access (5 total) |
+
+These accounts are automatically granted permissions and linked to test roles with appropriate access levels. Use them for development and testing without needing to manually run `grant-admin` scripts.
 
 ## Using from other runtimes (e.g., Flutter `lib/`)
 

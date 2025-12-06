@@ -45,30 +45,15 @@ class _TicketCreateScreenState extends State<TicketCreateScreen> {
 
     try {
       final orgId = locator<AuthService>().selectedOrganizationId ?? '';
-      final currentUser = locator<AuthService>().currentUser;
 
-      final newTicket = Ticket(
-        id: '', 
-        subject: _subjectCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
-        priority: _priority,
-        status: _status,
-        type: _type,
-        organizationId: orgId,
-        createdById: currentUser?.id,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        assigneeName: '',
-        ticketNumber: '',
-      );
-
-      final ticketMap = newTicket.toJson();
+      final ticketMap = {
+        'subject': _subjectCtrl.text.trim(),
+        'description': _descCtrl.text.trim(),
+        'priority': _priority.value,
+        'status': _status.value,
+        'organizationId': orgId,
+      };
       
-      ticketMap.remove('id');
-      ticketMap.remove('ticketNumber');
-      ticketMap.remove('createdAt');
-      ticketMap.remove('updatedAt');
-
       final res = await _ticketsService.createTicket(ticketMap);
       // ---------------------
 
@@ -281,17 +266,14 @@ class _TicketCreateScreenState extends State<TicketCreateScreen> {
     switch (p) {
       case TicketPriority.high:
       case TicketPriority.urgent:
-      case TicketPriority.critical:
         color = Colors.red;
-        break;
-      case TicketPriority.medium:
-        color = Colors.orange;
         break;
       case TicketPriority.normal:
         color = Colors.blue;
         break;
-      default:
+      case TicketPriority.low:
         color = Colors.grey;
+        break;
     }
     return Icon(Icons.circle, size: 10, color: color);
   }

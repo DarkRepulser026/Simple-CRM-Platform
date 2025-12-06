@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -70,6 +70,50 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _quickLogin(String email, String password) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Direct authentication with email/password (assuming auth service supports this)
+      // This would typically call an email/password authentication method
+      final success = await _authService.signInWithEmailPassword(email, password);
+      if (success && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      } else if (mounted) {
+        setState(() => _errorMessage = 'Quick login failed. Please ensure the account exists.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Error: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildQuickLoginButton(String label, String email, Color color) {
+    return FilledButton.tonal(
+      onPressed: _isLoading ? null : () => _quickLogin(email, 'test123'),
+      style: FilledButton.styleFrom(
+        backgroundColor: color.withOpacity(0.1),
+        foregroundColor: color,
+        side: BorderSide(color: color.withOpacity(0.3)),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
   }
 
   @override
@@ -395,6 +439,34 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
 
         const SizedBox(height: 32),
+
+        // Debug Quick Login (only in development)
+        if (kDebugMode)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '🔧 Debug: Quick Login',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange[700],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildQuickLoginButton('Admin', 'admin@example.com', Colors.red),
+                  _buildQuickLoginButton('Manager', 'manager@example.com', Colors.orange),
+                  _buildQuickLoginButton('Agent', 'agent@example.com', Colors.blue),
+                  _buildQuickLoginButton('Viewer', 'user@example.com', Colors.green),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
 
         // Footer / Terms
         Column(

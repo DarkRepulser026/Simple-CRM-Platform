@@ -382,4 +382,53 @@ class AuthServiceImpl implements AuthService {
       return false;
     }
   }
+
+  @override
+  Future<bool> signInWithEmailPassword(String email, String password) async {
+    try {
+      // Debug endpoint for development/testing
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '${ApiConfig.baseUrl}/auth/debug-login',
+        body: {
+          'email': email,
+          'password': password,
+        },
+      );
+
+      if (response.isError) {
+        debugPrint('Debug login failed: ${response.error}');
+        return false;
+      }
+
+      final authData = response.value;
+      final token = authData['token'] as String?;
+      final userJson = authData['user'] as Map<String, dynamic>?;
+      final orgJson = authData['organization'] as Map<String, dynamic>?;
+
+      if (token == null || userJson == null) {
+        debugPrint('Invalid debug login response');
+        return false;
+      }
+
+      // Store auth data
+      _jwtToken = token;
+      _currentUser = User.fromJson(userJson);
+      if (orgJson != null) {
+        _selectedOrganization = Organization.fromJson(orgJson);
+      }
+
+      // Persist
+      await _storage.saveToken(token);
+      await _storage.saveUser(jsonEncode(_currentUser!.toJson()));
+      if (_selectedOrganization != null) {
+        await _storage.saveOrganization(jsonEncode(_selectedOrganization!.toJson()));
+      }
+
+      debugPrint('Debug login successful for $email');
+      return true;
+    } catch (e) {
+      debugPrint('Debug login error: $e');
+      return false;
+    }
+  }
 }

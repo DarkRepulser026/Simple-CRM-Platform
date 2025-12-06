@@ -602,6 +602,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Contacts',
           onTap: () => AppRouter.navigateTo(context, AppRouter.contacts)),
       _SidebarItem(
+          icon: Icons.trending_up_rounded,
+          label: 'Leads',
+          onTap: () => AppRouter.navigateTo(context, AppRouter.leads)),
+      _SidebarItem(
           icon: Icons.task_outlined,
           label: 'Tasks',
           onTap: () => AppRouter.navigateTo(context, AppRouter.tasks)),
@@ -968,20 +972,6 @@ class _CompactMetricCard extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 24, color: color),
               ),
-              const Spacer(),
-              // Chỉ số tăng trưởng giả lập
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text('+12%',
-                    style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              )
             ],
           ),
           const SizedBox(height: 16),

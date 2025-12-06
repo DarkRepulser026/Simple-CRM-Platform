@@ -71,11 +71,13 @@ model UserOrganization {
   userId         String
   organizationId String
   role           UserRoleType @default(VIEWER)
+  userRoleId     String?      // Reference to the specific UserRole for this assignment
   joinedAt       DateTime     @default(now())
 
   // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRole     UserRole? @relation(fields: [userRoleId], references: [id], onDelete: SetNull)
 
   @@unique([userId, organizationId])
   @@map("user_organizations")
@@ -208,7 +210,8 @@ model UserRole {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments    UserOrganization[]
 
   @@unique([organizationId, name])
   @@map("user_roles")

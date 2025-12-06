@@ -38,6 +38,75 @@ import '../screens/tickets/ticket_create_screen.dart';
 import '../screens/tickets/ticket_detail_screen.dart';
 import '../screens/tickets/ticket_edit_screen.dart';
 
+/// ===== CUSTOM PAGE TRANSITIONS =====
+/// Smooth fade transition for better UX
+class FadeRoute<T> extends PageRoute<T> {
+  FadeRoute({required this.builder, RouteSettings? settings})
+      : super(settings: settings);
+
+  final WidgetBuilder builder;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return builder(context);
+  }
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 300);
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    return FadeTransition(opacity: animation, child: child);
+  }
+}
+
+/// Slide transition for detail screens
+class SlideRoute<T> extends PageRoute<T> {
+  SlideRoute({required this.builder, RouteSettings? settings})
+      : super(settings: settings);
+
+  final WidgetBuilder builder;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
+    return builder(context);
+  }
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 250);
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    const begin = Offset(1.0, 0.0);
+    const end = Offset.zero;
+    const curve = Curves.easeOutCubic;
+    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+    return SlideTransition(position: animation.drive(tween), child: child);
+  }
+}
+
 /// Typed route arguments for type-safe navigation
 class ContactDetailArgs {
   const ContactDetailArgs({required this.contactId});
@@ -53,6 +122,12 @@ class LeadDetailArgs {
 
 class TaskDetailArgs {
   const TaskDetailArgs({required this.taskId});
+
+  final String taskId;
+}
+
+class TaskEditArgs {
+  const TaskEditArgs({required this.taskId});
 
   final String taskId;
 }
@@ -115,19 +190,19 @@ class AppRouter {
     String route, {
     Object? arguments,
   }) {
-    return Navigator.of(context).pushNamed<T>(route, arguments: arguments);
+    return Navigator.of(context).pushNamed(route, arguments: arguments) as Future<T?>;
   }
 
-  /// Replace current route
+  /// Replace current route with smooth fade transition
   static Future<T?> replaceWith<T>(
     BuildContext context,
     String route, {
     Object? arguments,
   }) {
-    return Navigator.of(context).pushReplacementNamed<T, dynamic>(
+    return Navigator.of(context).pushReplacementNamed(
       route,
       arguments: arguments,
-    );
+    ).then((result) => result as T?);
   }
 
   /// Pop current route
@@ -175,46 +250,46 @@ class AppRouter {
   }
 
   /// Handle onGenerateRoute for dynamic routes with arguments
-  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+  static Route<Object?>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case adminUserDetail:
         final args = settings.arguments as UserDetailArgs?;
         if (args != null) {
-          if (!locator<AuthService>().isManagerOrAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
-          return MaterialPageRoute(builder: (context) => UserDetailScreen(userId: args.userId));
+          if (!locator<AuthService>().isManagerOrAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
+          return FadeRoute<Object?>(builder: (context) => UserDetailScreen(userId: args.userId));
         }
         break;
       case adminUserEdit:
         final editArgs = settings.arguments as UserDetailArgs?;
         if (editArgs != null) {
-          if (!locator<AuthService>().isManagerOrAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
-          return MaterialPageRoute(builder: (context) => UserEditScreen(userId: editArgs.userId));
+          if (!locator<AuthService>().isManagerOrAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
+          return FadeRoute<Object?>(builder: (context) => UserEditScreen(userId: editArgs.userId));
         }
         break;
       case activityLogs:
         final args = settings.arguments as ActivityLogsArgs?;
         if (args != null) {
-          if (!locator<AuthService>().isAdmin) return MaterialPageRoute(builder: (context) => const AccessDeniedRedirectScreen());
-          return MaterialPageRoute(builder: (context) => ActivityLogsScreen());
+          if (!locator<AuthService>().isAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
+          return FadeRoute<Object?>(builder: (context) => ActivityLogsScreen());
         }
         break;
             case accountDetail:
               final args = settings.arguments as AccountDetailArgs?;
               if (args != null) {
-                return MaterialPageRoute(
+                return SlideRoute<Object?>(
                   builder: (context) => AccountDetailScreen(accountId: args.accountId),
                 );
               }
             case accountEdit:
               final argsEdit = settings.arguments as AccountDetailArgs?;
               if (argsEdit != null) {
-                return MaterialPageRoute(builder: (context) => AccountEditScreen(accountId: argsEdit.accountId));
+                return SlideRoute<Object?>(builder: (context) => AccountEditScreen(accountId: argsEdit.accountId));
               }
               break;
       case contactDetail:
         final args = settings.arguments as ContactDetailArgs?;
         if (args != null) {
-          return MaterialPageRoute(
+          return SlideRoute<Object?>(
             builder: (context) => ContactDetailScreen(contactId: args.contactId),
           );
         }
@@ -222,17 +297,17 @@ class AppRouter {
         case contactEdit:
           final ca = settings.arguments as ContactEditArgs?;
           if (ca != null) {
-            return MaterialPageRoute(builder: (context) => ContactEditScreen(contactId: ca.contactId));
+            return SlideRoute<Object?>(builder: (context) => ContactEditScreen(contactId: ca.contactId));
           }
           // If args are missing show a helpful error page instead of returning null
-          return MaterialPageRoute(builder: (context) => Scaffold(
+          return SlideRoute<Object?>(builder: (context) => Scaffold(
             appBar: AppBar(title: const Text('Edit contact')), 
             body: Center(child: Text('Missing contact ID for edit route')), 
           ));
       case leadDetail:
         final args = settings.arguments as LeadDetailArgs?;
         if (args != null) {
-          return MaterialPageRoute(
+          return SlideRoute<Object?>(
             builder: (context) => LeadDetailScreen(leadId: args.leadId),
           );
         }
@@ -240,13 +315,13 @@ class AppRouter {
       case leadEdit:
         final args = settings.arguments as LeadEditArgs?;
         if (args != null) {
-          return MaterialPageRoute(builder: (context) => LeadEditScreen(leadId: args.leadId));
+          return SlideRoute<Object?>(builder: (context) => LeadEditScreen(leadId: args.leadId));
         }
         break;
       case taskDetail:
         final args = settings.arguments as TaskDetailArgs?;
         if (args != null) {
-          return MaterialPageRoute(
+          return SlideRoute<Object?>(
             builder: (context) => TaskDetailScreen(taskId: args.taskId),
           );
         }
@@ -254,13 +329,13 @@ class AppRouter {
       case taskEdit:
         final args = settings.arguments as TaskEditArgs?;
         if (args != null) {
-          return MaterialPageRoute(builder: (context) => TaskEditScreen(taskId: args.taskId));
+          return SlideRoute<Object?>(builder: (context) => TaskEditScreen(taskId: args.taskId));
         }
         break;
       case ticketDetail:
         final args = settings.arguments as TicketDetailArgs?;
         if (args != null) {
-          return MaterialPageRoute(
+          return SlideRoute<Object?>(
             builder: (context) => TicketDetailScreen(ticketId: args.ticketId),
           );
         }
@@ -268,11 +343,11 @@ class AppRouter {
       case ticketEdit:
         final args = settings.arguments as TicketEditArgs?;
         if (args != null) {
-          return MaterialPageRoute(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
+          return SlideRoute<Object?>(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
         }
         break;
         case adminInvite:
-          return MaterialPageRoute(builder: (context) => const InviteUserScreen());
+          return FadeRoute<Object?>(builder: (context) => const InviteUserScreen());
       
     }
     return null;

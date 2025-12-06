@@ -108,10 +108,15 @@ class ActivityLog {
 
   /// Computed property to get activity summary for display
   String get summary {
-    if (userName != null) {
-      return '$userName ${activityType.value.toLowerCase()}';
+    final actor = userName ?? 'System';
+    final action = activityType.value.toLowerCase();
+    final entity = entityType?.toLowerCase() ?? 'resource';
+    final detail = entityName ?? (entityId != null ? '#$entityId' : '');
+    
+    if (detail.isNotEmpty) {
+      return '$actor $action $entity: $detail';
     } else {
-      return 'System ${activityType.value.toLowerCase()}';
+      return '$actor $action $entity';
     }
   }
 

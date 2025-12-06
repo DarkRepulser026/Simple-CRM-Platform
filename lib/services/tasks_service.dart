@@ -47,10 +47,8 @@ class TasksService {
     String? status,
     String? priority,
     String? ownerId,
-    String? accountId,
-    String? contactId,
-    String? leadId,
     bool? overdue,
+    String? q,
   }) async {
     // Check authentication
     if (!_authService.isAuthenticated) {
@@ -71,26 +69,31 @@ class TasksService {
     if (ownerId != null && ownerId.isNotEmpty) {
       queryParams['ownerId'] = ownerId;
     }
-    if (accountId != null && accountId.isNotEmpty) {
-      queryParams['accountId'] = accountId;
-    }
-    if (contactId != null && contactId.isNotEmpty) {
-      queryParams['contactId'] = contactId;
-    }
-    if (leadId != null && leadId.isNotEmpty) {
-      queryParams['leadId'] = leadId;
-    }
     if (overdue != null) {
       queryParams['overdue'] = overdue.toString();
+    }
+    if (q != null && q.isNotEmpty) {
+      queryParams['q'] = q;
     }
 
     final uri = Uri.parse(ApiConfig.tasks).replace(queryParameters: queryParams);
 
     final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
     if (res.isError) return Result.error(res.error);
-    final jsonList = res.value as List<dynamic>;
-    final tasks = jsonList.map((t) => Task.fromJson(t as Map<String, dynamic>)).toList();
-    return Result.success(TasksResponse(tasks: tasks));
+    
+    if (res.value is List) {
+      // Backward compatibility: raw list response
+      final jsonList = res.value as List<dynamic>;
+      final tasks = jsonList.map((t) => Task.fromJson(t as Map<String, dynamic>)).toList();
+      return Result.success(TasksResponse(tasks: tasks));
+    }
+    
+    if (res.value is Map<String, dynamic>) {
+      // New format: with pagination
+      return Result.success(TasksResponse.fromJson(res.value as Map<String, dynamic>));
+    }
+    
+    return Result.error(ApiError.parsing('Unexpected response format for tasks'));
   }
 
   /// Get a single task by ID

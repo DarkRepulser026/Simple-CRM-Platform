@@ -90,7 +90,6 @@ class ApiClient {
     int retryCount = 0,
   }) async {
     try {
-      debugPrint('ApiClient: Performing $method $url');
       final uri = Uri.parse(url);
       final requestHeaders = await _buildHeaders(headers);
       final requestBody = _encodeBody(body);
@@ -98,18 +97,12 @@ class ApiClient {
       final request = http.Request(method, uri)
         ..headers.addAll(requestHeaders)
         ..body = requestBody ?? '';
-      if (kDebugMode) {
-        debugPrint('Request headers for $method $url: $requestHeaders');
-      }
 
       final streamedResponse = await _httpClient
           .send(request)
           .timeout(ApiConfig.receiveTimeout);
 
       final response = await http.Response.fromStream(streamedResponse);
-      if (kDebugMode) {
-        debugPrint('Response for $method $url: ${response.statusCode} ${response.body}');
-      }
 
       // Check if we should retry on certain errors
       if (_shouldRetry(response.statusCode) && retryCount < ApiConfig.maxRetries) {

@@ -44,6 +44,104 @@ async function createUsers(orgId, count) {
   return users;
 }
 
+async function createTestAccounts(orgId) {
+  // Verify organization exists before creating roles
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) {
+    throw new Error(`Organization with ID ${orgId} does not exist. Cannot create test accounts.`);
+  }
+
+  // Default permissions for each role type
+  const rolePermissions = {
+    ADMIN: [
+      'MANAGE_USERS', 'MANAGE_ROLES', 'MANAGE_ORGANIZATION',
+      'VIEW_CONTACTS', 'CREATE_CONTACTS', 'EDIT_CONTACTS', 'DELETE_CONTACTS',
+      'VIEW_LEADS', 'CREATE_LEADS', 'EDIT_LEADS', 'DELETE_LEADS', 'CONVERT_LEADS',
+      'VIEW_TICKETS', 'CREATE_TICKETS', 'EDIT_TICKETS', 'DELETE_TICKETS', 'ASSIGN_TICKETS', 'RESOLVE_TICKETS',
+      'VIEW_TASKS', 'CREATE_TASKS', 'EDIT_TASKS', 'DELETE_TASKS', 'ASSIGN_TASKS',
+      'VIEW_DASHBOARD', 'VIEW_REPORTS', 'VIEW_AUDIT_LOGS'
+    ],
+    MANAGER: [
+      'VIEW_CONTACTS', 'CREATE_CONTACTS', 'EDIT_CONTACTS', 'DELETE_CONTACTS',
+      'VIEW_LEADS', 'CREATE_LEADS', 'EDIT_LEADS', 'DELETE_LEADS', 'CONVERT_LEADS',
+      'VIEW_TICKETS', 'CREATE_TICKETS', 'EDIT_TICKETS', 'DELETE_TICKETS', 'ASSIGN_TICKETS', 'RESOLVE_TICKETS',
+      'VIEW_TASKS', 'CREATE_TASKS', 'EDIT_TASKS', 'DELETE_TASKS', 'ASSIGN_TASKS',
+      'VIEW_DASHBOARD', 'VIEW_REPORTS'
+    ],
+    AGENT: [
+      'VIEW_CONTACTS', 'CREATE_CONTACTS', 'EDIT_CONTACTS',
+      'VIEW_LEADS', 'CREATE_LEADS', 'EDIT_LEADS', 'CONVERT_LEADS',
+      'VIEW_TICKETS', 'CREATE_TICKETS', 'EDIT_TICKETS', 'ASSIGN_TICKETS', 'RESOLVE_TICKETS',
+      'VIEW_TASKS', 'CREATE_TASKS', 'EDIT_TASKS', 'ASSIGN_TASKS',
+      'VIEW_DASHBOARD'
+    ],
+    VIEWER: [
+      'VIEW_CONTACTS',
+      'VIEW_LEADS',
+      'VIEW_TICKETS',
+      'VIEW_TASKS',
+      'VIEW_DASHBOARD'
+    ]
+  };
+
+  // create test accounts for debug login feature
+  const testAccounts = [
+    { email: 'admin@example.com', name: 'Admin User', roleType: 'ADMIN' },
+    { email: 'manager@example.com', name: 'Manager User', roleType: 'MANAGER' },
+    { email: 'agent@example.com', name: 'Agent User', roleType: 'AGENT' },
+    { email: 'user@example.com', name: 'Viewer User', roleType: 'VIEWER' }
+  ];
+
+  const createdUsers = [];
+  for (const account of testAccounts) {
+    // Create or get user
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      update: { name: account.name },
+      create: { email: account.email, name: account.name }
+    });
+    createdUsers.push(user);
+
+    // Create UserRole if it doesn't exist with appropriate permissions
+    const userRole = await prisma.userRole.upsert({
+      where: {
+        organizationId_name: {
+          organizationId: orgId,
+          name: account.roleType
+        }
+      },
+      update: { permissions: rolePermissions[account.roleType] || [] },
+      create: {
+        name: account.roleType,
+        description: `${account.roleType} role for testing`,
+        roleType: account.roleType,
+        permissions: rolePermissions[account.roleType] || [],
+        organizationId: orgId,
+        isActive: true
+      }
+    });
+
+    // Create UserOrganization entry with the role and link to userRole
+    await prisma.userOrganization.upsert({
+      where: {
+        userId_organizationId: {
+          userId: user.id,
+          organizationId: orgId
+        }
+      },
+      update: { role: account.roleType, userRoleId: userRole.id },
+      create: {
+        userId: user.id,
+        organizationId: orgId,
+        role: account.roleType,
+        userRoleId: userRole.id
+      }
+    });
+  }
+
+  return createdUsers;
+}
+
 async function createUserOrganizations(orgId, users) {
   const data = users.map(u => ({ userId: u.id, organizationId: orgId, role: 'VIEWER' }));
   const batchSize = 1000;
@@ -280,8 +378,24 @@ async function main() {
   try {
     console.log('Starting large seeding process...');
     const { org, user } = await findOrCreateDefaultOrgAndUser();
-    const orgId = process.env.ORG_ID || org.id;
+    
+    // Use ORG_ID from env if provided and it exists, otherwise use the default org
+    let orgId = org.id;
+    if (process.env.ORG_ID) {
+      const envOrg = await prisma.organization.findUnique({ where: { id: process.env.ORG_ID } });
+      if (envOrg) {
+        orgId = process.env.ORG_ID;
+        console.log('Using environment ORG_ID');
+      } else {
+        console.warn(`Environment ORG_ID "${process.env.ORG_ID}" does not exist in database, using default org`);
+      }
+    }
     console.log('Target org id:', orgId);
+
+    // 0) Create test accounts for debug login
+    console.log('Creating test accounts for debug login...');
+    const testAccounts = await createTestAccounts(orgId);
+    console.log('Test accounts created:', testAccounts.map(u => u.email).join(', '));
 
     // 1) Create users
     const users = await createUsers(orgId, DEFAULTS.USERS);

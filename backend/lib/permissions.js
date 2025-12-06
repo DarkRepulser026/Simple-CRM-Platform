@@ -23,10 +23,24 @@ export const normalizePermissionsArray = (arr) => {
 };
 
 export const getUserPermissions = async (prismaClient, userId, organizationId) => {
-  const userOrg = await prismaClient.userOrganization.findFirst({ where: { userId, organizationId } });
+  const userOrg = await prismaClient.userOrganization.findFirst({ 
+    where: { userId, organizationId },
+    include: { userRole: true } 
+  });
+  
   if (!userOrg) return [];
+  
+  // Prefer userRoleId relationship if set
+  if (userOrg.userRole) {
+    return userOrg.userRole.permissions || [];
+  }
+  
+  // Fallback: lookup by roleType (for backward compatibility)
   const roleType = userOrg.role;
-  const role = await prismaClient.userRole.findFirst({ where: { organizationId, roleType } });
+  const role = await prismaClient.userRole.findFirst({ 
+    where: { organizationId, roleType } 
+  });
+  
   if (!role) return [];
   return role.permissions || [];
 };

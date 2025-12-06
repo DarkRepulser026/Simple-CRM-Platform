@@ -3,7 +3,7 @@ import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/role_visibility.dart';
-import 'contact_edit_screen.dart';
+import 'contact_edit_screen.dart' show showContactEditDialog;
 import '../../services/contacts_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
@@ -43,7 +43,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
         contactId: widget.contactId,
       );
       if (mounted) {
-        Navigator.of(context).pop(result ?? false);
+        Navigator.of(context, rootNavigator: true).pop(result ?? false);
       }
     });
   }
@@ -105,10 +105,7 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
   void _goToEdit() async {
     if (_contact == null) return;
     try {
-      final edited = await Navigator.of(context, rootNavigator: true).pushNamed<bool?>(
-        AppRouter.contactEdit,
-        arguments: ContactEditArgs(contactId: _contact!.id),
-      );
+      final edited = await showContactEditDialog(context, contactId: _contact!.id);
       if (edited == true) {
         // Close the detail dialog and indicate to caller that the contact changed
         Navigator.of(context).pop(true);
@@ -127,31 +124,33 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-          child: _isLoading
-              ? const SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: LoadingView(message: 'Loading contact...'),
-                  ),
-                )
-              : _error != null
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ErrorView(message: _error!, onRetry: _load),
-                        const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Close'),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 200,
+                    child: Center(
+                      child: LoadingView(message: 'Loading contact...'),
+                    ),
+                  )
+                : _error != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ErrorView(message: _error!, onRetry: _load),
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Close'),
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : _buildContent(context, colorScheme),
+                        ],
+                      )
+                    : _buildContent(context, colorScheme),
+          ),
         ),
       ),
     );

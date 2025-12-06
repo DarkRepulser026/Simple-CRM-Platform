@@ -163,7 +163,7 @@ class _TicketEditScreenState extends State<TicketEditScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Ticket #${_ticket?.ticketNumber ?? _ticket?.id.substring(0, 4) ?? ''}',
+                                'Ticket #${_ticket?.id.substring(0, 8).toUpperCase() ?? ''}',
                                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               Text(

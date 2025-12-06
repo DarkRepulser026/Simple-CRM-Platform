@@ -18,23 +18,29 @@ class TaskDetailScreen extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Task detail'),
-        backgroundColor: cs.surface,
+        title: const Text('Task Detail'),
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
-          child: Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: _TaskDetailCard(taskId: taskId),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: SingleChildScrollView(
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: cs.outline.withOpacity(0.1)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: _TaskDetailCard(taskId: taskId),
+                ),
+              ),
             ),
           ),
         ),
@@ -52,13 +58,16 @@ Future<void> showTaskDetailDialog(BuildContext context, String taskId) {
     builder: (ctx) {
       return Dialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
         ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: _TaskDetailCard(taskId: taskId),
+            child: SingleChildScrollView(
+              child: _TaskDetailCard(taskId: taskId),
+            ),
           ),
         ),
       );
@@ -168,7 +177,7 @@ class _TaskDetailCardState extends State<_TaskDetailCard> {
                       final res = await AppRouter.navigateTo<bool?>(
                         context,
                         AppRouter.taskEdit,
-                        arguments: TaskDetailArgs(taskId: task.id),
+                        arguments: TaskEditArgs(taskId: task.id),
                       );
                       if (res == true) Navigator.of(context).pop(true);
                     }();
@@ -426,3 +435,6 @@ class _MetaLine extends StatelessWidget {
     );
   }
 }
+
+// Helper functions for _TaskDetailCardState
+

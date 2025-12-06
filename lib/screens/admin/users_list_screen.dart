@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../models/user.dart';
+import '../../models/pagination.dart';
 import '../../services/service_locator.dart';
 import '../../services/users_service.dart';
-import '../../navigation/app_router.dart';
 import 'user_detail_screen.dart' as user_detail;
+import 'user_edit_screen.dart';
+import 'invite_user_screen.dart';
+import 'invitations_screen.dart';
 import '../../widgets/role_visibility.dart';
 import '../../services/auth/auth_service.dart';
 
@@ -23,29 +26,6 @@ class _UsersListScreenState extends State<UsersListScreen> {
   String _roleFilter = 'All';
 
   final List<String> _roleOptions = const ['All', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
-
-  Future<List<User>> _fetchPage(int page, int limit) async {
-    final res = await _usersService.getUsers(page: page, limit: limit);
-    if (!res.isSuccess) throw Exception(res.error.message);
-
-    var users = res.value.users;
-
-
-    if (_search.isNotEmpty) {
-      final q = _search.toLowerCase();
-      users = users
-          .where((u) =>
-              u.name.toLowerCase().contains(q) ||
-              u.email.toLowerCase().contains(q))
-          .toList();
-    }
-
-    if (_roleFilter != 'All') {
-      users = users.where((u) => (u.role ?? '').toUpperCase() == _roleFilter).toList();
-    }
-
-    return users;
-  }
 
   @override
   void initState() {
@@ -111,9 +91,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
                         children: [
                           OutlinedButton.icon(
                             onPressed: () async {
-                              final res = await AppRouter.navigateTo<bool?>(
-                                context,
-                                AppRouter.adminInvitations,
+                              final res = await Navigator.of(context).push<bool?>(
+                                MaterialPageRoute(
+                                  builder: (context) => const InvitationsScreen(),
+                                ),
                               );
                               if (res == true) _refreshList();
                             },
@@ -123,9 +104,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
                           const SizedBox(width: 8),
                           FilledButton.icon(
                             onPressed: () async {
-                              final res = await AppRouter.navigateTo<bool?>(
-                                context,
-                                AppRouter.adminInvite,
+                              final res = await Navigator.of(context).push<bool?>(
+                                MaterialPageRoute(
+                                  builder: (context) => const InviteUserScreen(),
+                                ),
                               );
                               if (res == true) _refreshList();
                             },
@@ -274,6 +256,16 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                       ?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                               ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  'Created',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
                               const SizedBox(
                                 width: 40,
                                 child: Center(
@@ -293,8 +285,25 @@ class _UsersListScreenState extends State<UsersListScreen> {
                         Expanded(
                           child: PaginatedListView<User>(
                             key: ValueKey(_reloadVersion),
-                            fetchPage: _fetchPage,
-                            pageSize: 20,
+                            fetchPaginated: (page, limit) async {
+                              final res = await _usersService.getUsers(
+                                page: page,
+                                limit: limit,
+                                search: _search.isNotEmpty ? _search : null,
+                              );
+                              if (!res.isSuccess) throw Exception(res.error.message);
+                              
+                              var users = res.value.users;
+                              
+                              // Apply client-side role filter
+                              if (_roleFilter != 'All') {
+                                users = users.where((u) => (u.role ?? '').toUpperCase() == _roleFilter).toList();
+                              }
+                              
+                              final pagination = res.value.pagination ?? Pagination(page: page, limit: limit, total: users.length, totalPages: 1, hasNext: false, hasPrev: false);
+                              return PaginatedResponse<User>(items: users, pagination: pagination);
+                            },
+                            pageSize: 9,
                             emptyMessage: 'No users',
                             errorMessage: 'Failed to load users',
                             loadingMessage: 'Loading users...',
@@ -386,6 +395,23 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                               context, user.isActive),
                                         ),
                                       ),
+                                      // Created date
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          user.createdAt != null
+                                              ? _formatDate(user.createdAt!)
+                                              : '—',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ),
                                       // Actions
                                       SizedBox(
                                         width: 40,
@@ -414,10 +440,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
                                                 );
                                               }
                                             } else if (value == 'edit') {
-                                              final res = await AppRouter.navigateTo<bool?>(
-                                                context,
-                                                AppRouter.adminUserEdit,
-                                                arguments: UserDetailArgs(userId: user.id),
+                                              final res = await Navigator.of(context).push<bool?>(
+                                                MaterialPageRoute(
+                                                  builder: (context) => UserEditScreen(userId: user.id),
+                                                ),
                                               );
                                               if (res == true) _refreshList();
                                             } else if (value == 'remove') {
@@ -577,5 +603,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
         ],
       ),
     );
+  }
+
+  /// Format DateTime to a short date string (e.g., '2025-12-06')
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
   }
 }

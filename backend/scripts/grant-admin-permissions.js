@@ -48,11 +48,11 @@ async function main() {
     }
       console.log('Found user:', user.id, user.email);
 
-    // Upsert userOrganization to ensure ADMIN role
+    // Upsert userOrganization to ensure ADMIN role with userRoleId reference
     const userOrg = await prisma.userOrganization.upsert({
       where: { userId_organizationId: { userId: user.id, organizationId: orgId } },
-      create: { userId: user.id, organizationId: orgId, role: 'ADMIN' },
-      update: { role: 'ADMIN' },
+      create: { userId: user.id, organizationId: orgId, role: 'ADMIN', userRoleId: role.id },
+      update: { role: 'ADMIN', userRoleId: role.id },
     });
     console.log('Assigned ADMIN to user org:', userOrg.id);
   } catch (e) {

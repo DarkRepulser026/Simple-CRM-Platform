@@ -178,12 +178,6 @@ class AdminMetricsGrid extends StatelessWidget {
                   color: Colors.teal,
                 ),
                 _MetricCard(
-                  title: 'System Health',
-                  value: metrics.systemHealth,
-                  icon: Icons.health_and_safety_rounded,
-                  color: Colors.green,
-                ),
-                _MetricCard(
                   title: 'Ticket Load',
                   value: metrics.ticketLoad.toStringAsFixed(1),
                   icon: Icons.work_outline,

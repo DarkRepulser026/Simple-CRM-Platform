@@ -6,6 +6,7 @@ import '../../services/roles_service.dart';
 import '../../services/auth/auth_service.dart';
 import '../../widgets/role_visibility.dart';
 import '../../screens/access_denied_redirect_screen.dart';
+import '../../screens/admin/role_detail_screen.dart';
 
 // ===== MÀN HÌNH CHÍNH =====
 class RolesListScreen extends StatefulWidget {
@@ -612,7 +613,14 @@ class _RoleRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: allowEdit ? onEdit : null,
+          onTap: () {
+            // Navigate to detail screen when clicking on role row
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => RoleDetailScreen(roleId: role.id),
+              ),
+            );
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
@@ -629,20 +637,69 @@ class _RoleRow extends StatelessWidget {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Icon(
-                          Icons.security, // Biểu tượng vai trò chung
+                          Icons.security,
                           size: 18,
                           color: colorScheme.primary,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Flexible(
-                        child: Text(
-                          role.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              role.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            // Status badges
+                            Wrap(
+                              spacing: 4,
+                              children: [
+                                if (role.isDefault)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Default',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.purple,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                                if (!role.isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Inactive',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -684,16 +741,27 @@ class _RoleRow extends StatelessWidget {
                 ),
                 // 5. Actions
                 SizedBox(
-                  width: 32, // Đặt chiều rộng cố định cho PopupMenuButton
+                  width: 32,
                   child: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'edit') {
                         onEdit();
                       } else if (value == 'delete') {
                         onDelete();
+                      } else if (value == 'view') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                RoleDetailScreen(roleId: role.id),
+                          ),
+                        );
                       }
                     },
                     itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'view',
+                        child: Text('View Details'),
+                      ),
                       if (allowEdit)
                         const PopupMenuItem(
                           value: 'edit',

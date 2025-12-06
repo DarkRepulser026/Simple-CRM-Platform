@@ -47,8 +47,7 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
           final q = _searchCtrl.text.toLowerCase();
           tickets = tickets.where((t) {
             final subjectMatch = t.subject.toLowerCase().contains(q);
-            final numberMatch = (t.ticketNumber ?? '').toLowerCase().contains(q);
-            return subjectMatch || numberMatch;
+            return subjectMatch;
           }).toList();
         }
         return tickets;
@@ -264,10 +263,10 @@ class _TicketRow extends StatelessWidget {
     final createdStr = "${ticket.createdAt.year}-${ticket.createdAt.month.toString().padLeft(2,'0')}-${ticket.createdAt.day.toString().padLeft(2,'0')}";
 
     // Xử lý null an toàn
-    final assigneeName = ticket.assigneeName ?? '';
-    final displayAssignee = assigneeName.isEmpty ? 'Unassigned' : assigneeName;
-    final initialAssignee = assigneeName.isNotEmpty ? assigneeName[0].toUpperCase() : '?';
-    final ticketNum = ticket.ticketNumber ?? '---';
+    final ownerName = ticket.ownerName ?? '';
+    final displayAssignee = ownerName.isEmpty ? 'Unassigned' : ownerName;
+    final initialAssignee = ownerName.isNotEmpty ? ownerName[0].toUpperCase() : '?';
+    final ticketNum = ticket.id.substring(0, 8).toUpperCase();
 
     return InkWell(
       onTap: onTap,
@@ -378,12 +377,12 @@ class _StatusChip extends StatelessWidget {
     switch (status) {
       case TicketStatus.open:
         bg = Colors.green.withOpacity(0.1); fg = Colors.green[700]!; break;
-      case TicketStatus.pending:
-        bg = Colors.orange.withOpacity(0.1); fg = Colors.orange[800]!; break;
+      case TicketStatus.inProgress:
+        bg = Colors.blue.withOpacity(0.1); fg = Colors.blue[700]!; break;
+      case TicketStatus.resolved:
+        bg = Colors.cyan.withOpacity(0.1); fg = Colors.cyan[700]!; break;
       case TicketStatus.closed:
         bg = Colors.grey.withOpacity(0.15); fg = Colors.grey[700]!; break;
-      default:
-        bg = Colors.blue.withOpacity(0.1); fg = Colors.blue[700]!;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -405,11 +404,10 @@ class _PriorityIcon extends StatelessWidget {
     switch (priority) {
       case TicketPriority.high:
       case TicketPriority.urgent:
-      case TicketPriority.critical: // Đã thêm critical để khớp model
         return const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red);
-      case TicketPriority.medium:
-        return const Icon(Icons.import_export, size: 16, color: Colors.orange);
-      default:
+      case TicketPriority.normal:
+        return Icon(Icons.import_export, size: 16, color: Theme.of(context).colorScheme.outline);
+      case TicketPriority.low:
         return Icon(Icons.arrow_downward, size: 16, color: Theme.of(context).colorScheme.outline);
     }
   }

@@ -16,8 +16,10 @@ Future<bool?> showContactEditDialog(
   BuildContext context, {
   required String contactId,
 }) {
+  debugPrint('showContactEditDialog: request for $contactId');
   return showDialog<bool>(
     context: context,
+    useRootNavigator: true,
     barrierDismissible: false,
     builder: (_) => _ContactEditDialog(contactId: contactId),
   );
@@ -43,11 +45,11 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
           contactId: widget.contactId,
         );
         if (mounted) {
-          Navigator.of(context).pop(result ?? false);
+          Navigator.of(context, rootNavigator: true).pop(result ?? false);
         }
       } catch (e, st) {
         debugPrint('Failed to open ContactEditDialog: $e\n$st');
-        if (mounted) Navigator.of(context).pop(false);
+        if (mounted) Navigator.of(context, rootNavigator: true).pop(false);
       }
     });
   }
@@ -105,6 +107,7 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
     _contactsService = locator<ContactsService>();
     _usersService = locator<UsersService>();
     _load();
+    debugPrint('ContactEditDialog:init');
   }
 
   Future<void> _load() async {
@@ -205,16 +208,18 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-          child: _isLoading
-              ? const SizedBox(
-                  height: 220,
-                  child: Center(
-                    child: LoadingView(message: 'Loading contact...'),
-                  ),
-                )
-              : _buildContent(context, colorScheme),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 220,
+                    child: Center(
+                      child: LoadingView(message: 'Loading contact...'),
+                    ),
+                  )
+                : _buildContent(context, colorScheme),
+          ),
         ),
       ),
     );

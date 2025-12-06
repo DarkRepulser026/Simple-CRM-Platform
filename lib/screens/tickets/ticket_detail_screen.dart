@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/ticket.dart';
 import '../../services/service_locator.dart';
-import '../../navigation/app_router.dart';
-import 'ticket_edit_screen.dart';
 import '../../services/tickets_service.dart';
-import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
+import '../../widgets/error_view.dart';
 
 // Argument class để truyền ID khi navigate
 class TicketDetailArgs {
@@ -13,486 +11,520 @@ class TicketDetailArgs {
   const TicketDetailArgs({required this.ticketId});
 }
 
-class TicketDetailScreen extends StatefulWidget {
+class TicketDetailScreen extends StatelessWidget {
   final String ticketId;
-
   const TicketDetailScreen({super.key, required this.ticketId});
 
   @override
-  State<TicketDetailScreen> createState() => _TicketDetailScreenState();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Ticket Detail'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: SingleChildScrollView(
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: cs.outline.withOpacity(0.1)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: _TicketDetailCard(ticketId: ticketId, onChanged: () {
+                    // Reload on edit
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _TicketDetailScreenState extends State<TicketDetailScreen> {
+/// Pop-up dialog dùng trong TicketsListScreen
+Future<bool?> showTicketDetailDialog(BuildContext context, {required String ticketId}) {
+  return showDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    useRootNavigator: true,
+    builder: (ctx) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: _TicketDetailCard(ticketId: ticketId),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TicketDetailCard extends StatefulWidget {
+  final String ticketId;
+  final VoidCallback? onChanged;
+  const _TicketDetailCard({required this.ticketId, this.onChanged});
+
+  @override
+  State<_TicketDetailCard> createState() => _TicketDetailCardState();
+}
+
+class _TicketDetailCardState extends State<_TicketDetailCard> {
   late final TicketsService _ticketsService;
-  late Future<Ticket> _futureTicket;
+  bool _isLoading = true;
+  String? _error;
+  Ticket? _ticket;
 
   @override
   void initState() {
     super.initState();
     _ticketsService = locator<TicketsService>();
-    _futureTicket = _fetchTicket();
+    _load();
   }
 
-  Future<Ticket> _fetchTicket() async {
-    final res = await _ticketsService.getTicket(widget.ticketId);
-    if (res.isSuccess) return res.value;
-    throw Exception(res.error.message);
-  }
-
-  void _refresh() {
+  Future<void> _load() async {
     setState(() {
-      _futureTicket = _fetchTicket();
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      final res = await _ticketsService.getTicket(widget.ticketId);
+      if (res.isSuccess) {
+        setState(() {
+          _ticket = res.value;
+          _isLoading = false;
+        });
+        return;
+      }
+      throw Exception(res.error.message);
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load ticket: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    const bgColor = Color(0xFFE9EDF5); // Màu nền Dashboard
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: cs.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Ticket Details',
-          style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.edit_outlined, color: cs.onSurface),
-            tooltip: 'Edit Ticket',
-            onPressed: () async {
-              final res = await AppRouter.navigateTo<bool?>(
-                context,
-                AppRouter.ticketEdit,
-                arguments: TicketEditArgs(ticketId: widget.ticketId),
-              );
-              if (res == true) Navigator.of(context).pop(true);
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: FutureBuilder<Ticket>(
-        future: _futureTicket,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const LoadingView(message: 'Loading ticket details...');
-          }
-          if (snapshot.hasError) {
-            return ErrorView(
-              message: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: Text('Ticket not found'));
-          }
-
-          final ticket = snapshot.data!;
-          
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 900;
-              
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: isWide 
-                        ? _buildWideLayout(context, ticket) 
-                        : _buildNarrowLayout(context, ticket),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  // --- LAYOUTS ---
-
-  // Layout cho Desktop/Web (2 cột)
-  Widget _buildWideLayout(BuildContext context, Ticket ticket) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 7,
-          child: Column(
-            children: [
-              _buildMainInfoCard(context, ticket),
-              const SizedBox(height: 24),
-              _buildActivitySection(context),
-            ],
-          ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          flex: 3,
-          child: _buildSidebarCard(context, ticket),
-        ),
-      ],
-    );
-  }
-
-  // Layout cho Mobile
-  Widget _buildNarrowLayout(BuildContext context, Ticket ticket) {
-    return Column(
-      children: [
-        _buildMainInfoCard(context, ticket),
-        const SizedBox(height: 24),
-        _buildSidebarCard(context, ticket),
-        const SizedBox(height: 24),
-        _buildActivitySection(context),
-      ],
-    );
-  }
-
-  // --- WIDGET COMPONENTS ---
-
-  /// Card with Title & Description
-  Widget _buildMainInfoCard(BuildContext context, Ticket ticket) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final ticketNum = ticket.ticketNumber ?? ticket.id.substring(0, 8);
 
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Breadcrumb / ID
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '#$ticketNum',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
+    if (_isLoading) {
+      return const Center(child: LoadingView(message: 'Loading ticket...'));
+    }
+    if (_error != null) {
+      return Center(child: ErrorView(message: _error!, onRetry: _load));
+    }
+    if (_ticket == null) {
+      return const Center(child: Text('No ticket data'));
+    }
+
+    final ticket = _ticket!;
+    final (statusBg, statusFg, statusIcon) = _getStatusStyle(ticket.status, cs);
+    final priorityColor = _getPriorityColor(ticket.priority, cs);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ticket.subject,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '#${ticket.id.substring(0, 8).toUpperCase()}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                _formatDate(ticket.createdAt),
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusBg,
+                borderRadius: BorderRadius.circular(6),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(statusIcon, size: 14, color: statusFg),
+                  const SizedBox(width: 4),
+                  Text(
+                    ticket.status.value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: statusFg,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Divider(height: 1),
+        const SizedBox(height: 24),
+
+        // Details Section
+        Text(
+          'DETAILS',
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: cs.onSurfaceVariant,
           ),
-          const SizedBox(height: 16),
-          
-          // Subject
-          Text(
-            ticket.subject,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: cs.onSurface,
+        ),
+        const SizedBox(height: 16),
+
+        // Priority
+        _buildDetailRow(
+          context,
+          label: 'Priority',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: priorityColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              ticket.priority.value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: priorityColor,
+              ),
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+
+        // Category
+        if (ticket.category != null && ticket.category!.isNotEmpty)
+          _buildDetailRow(
+            context,
+            label: 'Category',
+            child: Text(ticket.category!),
+          ),
+        if (ticket.category != null && ticket.category!.isNotEmpty)
+          const SizedBox(height: 12),
+
+        // Owner
+        if (ticket.ownerName != null && ticket.ownerName!.isNotEmpty)
+          _buildDetailRow(
+            context,
+            label: 'Assigned To',
+            child: Text(ticket.ownerName!),
+          ),
+        if (ticket.ownerName != null && ticket.ownerName!.isNotEmpty)
+          const SizedBox(height: 12),
+
+        // Created Date
+        _buildDetailRow(
+          context,
+          label: 'Created',
+          child: Text(
+            ticket.createdAt.toString().split('.')[0],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Updated Date
+        _buildDetailRow(
+          context,
+          label: 'Last Updated',
+          child: Text(
+            ticket.updatedAt.toString().split('.')[0],
+          ),
+        ),
+
+        if (ticket.description != null && ticket.description!.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const Divider(),
+          const Divider(height: 1),
           const SizedBox(height: 24),
-          
-          // Description Label
           Text(
-            'Description',
-            style: theme.textTheme.titleMedium?.copyWith(
+            'DESCRIPTION',
+            style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: cs.onSurface,
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
-          
-          // Description Content
-          Text(
-            ticket.description != null && ticket.description!.isNotEmpty 
-                ? ticket.description! 
-                : 'No description provided.',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.5,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              ticket.description!,
+              style: theme.textTheme.bodyMedium,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// The card on the right displays metadata (Status, Priority, Assignee...)
-  Widget _buildSidebarCard(BuildContext context, Ticket ticket) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Properties',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cs.onSurface),
-          ),
-          const SizedBox(height: 24),
-          
-          _buildPropertyRow(context, 'Status', _buildStatusChip(context, ticket.status)),
-          const Divider(height: 32),
-          
-          _buildPropertyRow(context, 'Priority', _buildPriorityRow(context, ticket.priority)),
-          const Divider(height: 32),
-          
-          _buildPropertyRow(context, 'Type', Text(ticket.type.value)),
-          const Divider(height: 32),
-          
-          _buildPropertyRow(context, 'Assignee', _buildAssigneeRow(context, ticket.assigneeName)),
-          const Divider(height: 32),
-          
-          _buildPropertyRow(context, 'Requester', 
-            Text(ticket.createdById ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w500))
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPropertyRow(BuildContext context, String label, Widget content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.outline,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
+        
+        const SizedBox(height: 24),
+        const Divider(height: 1),
+        const SizedBox(height: 24),
+        
+        // Edit Button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.edit),
+            label: const Text('Edit Ticket'),
+            onPressed: () => _showEditDialog(context),
           ),
         ),
-        const SizedBox(height: 8),
-        content,
       ],
     );
   }
 
-  /// Phần Activity / Comments (Giả lập giao diện)
-  Widget _buildActivitySection(BuildContext context) {
+  Widget _buildDetailRow(BuildContext context, {required String label, required Widget child}) {
     final cs = Theme.of(context).colorScheme;
-    
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.history, color: cs.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                'Activity',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: cs.onSurface),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          // Input giả
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Add an internal note or reply...',
-              filled: true,
-              fillColor: cs.surfaceVariant.withOpacity(0.3),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.send),
-                onPressed: () {},
-                color: cs.primary,
-              ),
+    return Row(
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: cs.onSurfaceVariant,
             ),
-            maxLines: 2,
           ),
-          
-          const SizedBox(height: 32),
-          
-          // List Activity (Demo static)
-          _buildActivityItem(context, 'System', 'Ticket created', '2 days ago', isSystem: true),
-          _buildActivityItem(context, 'Admin', 'Changed priority to High', '1 day ago', isSystem: true),
-          _buildActivityItem(context, 'Support Agent', 'Hello, we are looking into this issue. Please provide more logs.', '5 hours ago', isSystem: false),
-        ],
-      ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(child: child),
+      ],
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, String user, String content, String time, {bool isSystem = false}) {
-    final cs = Theme.of(context).colorScheme;
-    
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: isSystem ? cs.surfaceVariant : cs.primaryContainer,
-            child: Text(
-              user[0], 
-              style: TextStyle(
-                fontSize: 12, 
-                color: isSystem ? cs.onSurfaceVariant : cs.onPrimaryContainer, 
-                fontWeight: FontWeight.bold
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(user, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(width: 8),
-                    Text(time, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content, 
-                  style: TextStyle(
-                    color: isSystem ? cs.onSurfaceVariant : cs.onSurface,
-                    fontStyle: isSystem ? FontStyle.italic : FontStyle.normal
-                  )
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- HELPERS HIỂN THỊ ---
-
-  Widget _buildStatusChip(BuildContext context, TicketStatus status) {
-    Color bg, fg;
+  (Color, Color, IconData) _getStatusStyle(TicketStatus status, ColorScheme cs) {
     switch (status) {
-      case TicketStatus.open: bg = Colors.green.shade50; fg = Colors.green.shade700; break;
-      case TicketStatus.pending: bg = Colors.orange.shade50; fg = Colors.orange.shade800; break;
-      case TicketStatus.closed: bg = Colors.grey.shade100; fg = Colors.grey.shade700; break;
-      default: bg = Colors.blue.shade50; fg = Colors.blue.shade700;
+      case TicketStatus.open:
+        return (Colors.green.withOpacity(0.1), Colors.green[700]!, Icons.circle);
+      case TicketStatus.inProgress:
+        return (Colors.blue.withOpacity(0.1), Colors.blue[700]!, Icons.autorenew);
+      case TicketStatus.resolved:
+        return (Colors.cyan.withOpacity(0.1), Colors.cyan[700]!, Icons.check_circle);
+      case TicketStatus.closed:
+        return (Colors.grey.withOpacity(0.15), Colors.grey[700]!, Icons.lock);
     }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(status.value, style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 13)),
-    );
   }
 
-  Widget _buildPriorityRow(BuildContext context, TicketPriority priority) {
-    IconData icon;
-    Color color;
+  Color _getPriorityColor(TicketPriority priority, ColorScheme cs) {
     switch (priority) {
-      case TicketPriority.critical:
       case TicketPriority.urgent:
       case TicketPriority.high:
-        icon = Icons.warning_amber_rounded; color = Colors.red; break;
-      case TicketPriority.medium:
-        icon = Icons.density_medium_rounded; color = Colors.orange; break;
+        return Colors.red;
       case TicketPriority.normal:
-        icon = Icons.horizontal_rule_rounded; color = Theme.of(context).colorScheme.primary; break;
-      default:
-        icon = Icons.arrow_downward_rounded; color = Colors.grey;
+        return cs.primary;
+      case TicketPriority.low:
+        return Colors.grey;
     }
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Text(priority.value, style: const TextStyle(fontWeight: FontWeight.w500)),
-      ],
-    );
   }
 
-  Widget _buildAssigneeRow(BuildContext context, String? assigneeName) {
-    if (assigneeName == null || assigneeName.isEmpty) {
-      return const Text('Unassigned', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey));
-    }
-    return Row(
-      children: [
-        CircleAvatar(radius: 12, backgroundColor: Colors.blue.shade100, child: Text(assigneeName[0], style: const TextStyle(fontSize: 10))),
-        const SizedBox(width: 8),
-        Text(assigneeName, style: const TextStyle(fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
+  void _showEditDialog(BuildContext context) {
+    if (_ticket == null) return;
+    
+    final subjectCtrl = TextEditingController(text: _ticket!.subject);
+    final descriptionCtrl = TextEditingController(text: _ticket!.description ?? '');
+    final categoryCtrl = TextEditingController(text: _ticket!.category ?? '');
+    String? selectedStatus = _ticket!.status.name;
+    String? selectedPriority = _ticket!.priority.name;
 
-  String _formatDate(DateTime date) {
-    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour}:${date.minute}";
-  }
-}
-
-/// Dialog helper to show ticket detail as modal. Keeps consistent look with TicketDetailScreen content.
-Future<bool?> showTicketDetailDialog(BuildContext context, {required String ticketId}) {
-  return showDialog<bool>(
-    context: context,
-    useRootNavigator: true,
-    builder: (ctx) => Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SingleChildScrollView(child: TicketDetailScreen(ticketId: ticketId)),
+    showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (ctx, setState) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit Ticket',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Subject
+                    TextField(
+                      controller: subjectCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Subject',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Description
+                    TextField(
+                      controller: descriptionCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Category
+                    TextField(
+                      controller: categoryCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Status Dropdown
+                    DropdownButtonFormField<String>(
+                      value: selectedStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Status',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: TicketStatus.values
+                          .map((e) => DropdownMenuItem(
+                            value: e.name,
+                            child: Text(e.value),
+                          ))
+                          .toList(),
+                      onChanged: (val) => setState(() => selectedStatus = val),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Priority Dropdown
+                    DropdownButtonFormField<String>(
+                      value: selectedPriority,
+                      decoration: const InputDecoration(
+                        labelText: 'Priority',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: TicketPriority.values
+                          .map((e) => DropdownMenuItem(
+                            value: e.name,
+                            child: Text(e.value),
+                          ))
+                          .toList(),
+                      onChanged: (val) => setState(() => selectedPriority = val),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () => _saveTicket(
+                            subjectCtrl.text,
+                            descriptionCtrl.text,
+                            categoryCtrl.text,
+                            selectedStatus,
+                            selectedPriority,
+                            dialogCtx,
+                          ),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Future<void> _saveTicket(
+    String subject,
+    String description,
+    String category,
+    String? status,
+    String? priority,
+    BuildContext dialogCtx,
+  ) async {
+    try {
+      final updateData = {
+        'subject': subject,
+        if (description.isNotEmpty) 'description': description,
+        if (category.isNotEmpty) 'category': category,
+        if (status != null) 'status': status.toUpperCase(),
+        if (priority != null) 'priority': priority.toUpperCase(),
+      };
+
+      final res = await _ticketsService.updateTicket(widget.ticketId, updateData);
+      
+      if (res.isSuccess) {
+        if (mounted) {
+          Navigator.pop(dialogCtx);
+          setState(() {
+            _ticket = res.value;
+          });
+          widget.onChanged?.call();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ticket updated successfully')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(dialogCtx).showSnackBar(
+            SnackBar(content: Text('Error: ${res.error.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(dialogCtx).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
 }
