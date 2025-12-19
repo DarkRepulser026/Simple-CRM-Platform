@@ -51,7 +51,8 @@ describe('Admin actions - Integration tests', function() {
   it('should list activity logs (GET /activity_logs)', async () => {
     const res = await fetch(`${BASE_URL}/activity_logs`, { headers: { 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId } });
     expect(res.ok).to.be.true;
-    const logs = await res.json();
-    expect(Array.isArray(logs)).to.be.true;
+    const data = await res.json();
+    expect(data).to.have.property('logs');
+    expect(Array.isArray(data.logs)).to.be.true;
   });
 });

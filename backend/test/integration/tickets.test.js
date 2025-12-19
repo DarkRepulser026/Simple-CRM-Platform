@@ -47,9 +47,7 @@ describe('Tickets API - Integration tests', function() {
     } catch (e) {
       // ignore cleanup errors
     }
-    if (serverProc) {
-      serverProc.kill();
-    }
+    await stopServer();
   });
 
   it('should assign a ticket (POST /tickets/:id/assign)', async () => {

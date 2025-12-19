@@ -25,7 +25,32 @@ export async function waitForHealth(timeoutMs = 15000) {
 }
 
 export async function stopServer() {
-  if (serverProc) serverProc.kill();
+  if (serverProc) {
+    serverProc.kill('SIGTERM');
+    
+    // Wait for the process to actually exit
+    await new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.log('[test] Server did not exit gracefully, forcing kill...');
+        serverProc.kill('SIGKILL');
+        resolve();
+      }, 5000); // Wait up to 5 seconds
+      
+      serverProc.on('exit', (code, signal) => {
+        clearTimeout(timeout);
+        console.log(`[test] Server exited with code ${code}, signal ${signal}`);
+        resolve();
+      });
+      
+      serverProc.on('error', (err) => {
+        clearTimeout(timeout);
+        console.log(`[test] Server error during shutdown: ${err.message}`);
+        resolve();
+      });
+    });
+    
+    serverProc = null;
+  }
 }
 
 export async function createAdminUserAndOrg() {

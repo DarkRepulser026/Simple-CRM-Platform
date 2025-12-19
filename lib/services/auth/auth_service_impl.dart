@@ -53,7 +53,8 @@ class AuthServiceImpl implements AuthService {
           if (res.isSuccess && res.value.organizations.length == 1) {
             await selectOrganization(res.value.organizations.first.id);
           }
-        } catch (_) {
+        } catch (e) {
+          debugPrint('Failed to auto-select organization: $e');
           // ignore - optional behavior
         }
       }
