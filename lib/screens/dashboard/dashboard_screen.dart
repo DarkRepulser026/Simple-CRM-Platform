@@ -89,9 +89,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (acceptedFound) {
             _showedInviteToast = true;
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invite accepted')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Invite accepted')));
             }
           }
         }
@@ -112,9 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                'Please select an organization to view dashboard',
-              ),
+              content: Text('Please select an organization to view dashboard'),
             ),
           );
           AppRouter.navigateTo(context, AppRouter.companySelection);
@@ -217,64 +215,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Expanded(
                           flex: 3,
-                          child: _buildMetricRow(
-                            'Weekly Performance',
-                            [
-                              _CompactMetricCard(
-                                title: 'Leads',
-                                value: _metrics!.leadsThisWeek.toString(),
-                                icon: Icons.bolt_rounded,
-                                color: Colors.amber[700]!, // Màu vàng cam
-                              ),
-                              _CompactMetricCard(
-                                title: 'Resolved',
-                                value:
-                                    _metrics!.ticketsResolvedThisWeek.toString(),
-                                icon: Icons.check_circle_outline_rounded,
-                                color: Colors.teal[600] ?? Colors.green,
-                              ),
-                              _CompactMetricCard(
-                                title: 'Completed',
-                                value:
-                                    _metrics!.tasksCompletedThisWeek.toString(),
-                                icon: Icons.done_all_rounded,
-                                color: Colors.indigo[500]!,
-                              ),
-                            ],
-                          ),
+                          child: _buildMetricRow('Weekly Performance', [
+                            _CompactMetricCard(
+                              title: 'Leads',
+                              value: _metrics!.leadsThisWeek.toString(),
+                              icon: Icons.bolt_rounded,
+                              color: Colors.amber[700]!, // Màu vàng cam
+                            ),
+                            _CompactMetricCard(
+                              title: 'Resolved',
+                              value: _metrics!.ticketsResolvedThisWeek
+                                  .toString(),
+                              icon: Icons.check_circle_outline_rounded,
+                              color: Colors.teal[600] ?? Colors.green,
+                            ),
+                            _CompactMetricCard(
+                              title: 'Completed',
+                              value: _metrics!.tasksCompletedThisWeek
+                                  .toString(),
+                              icon: Icons.done_all_rounded,
+                              color: Colors.indigo[500]!,
+                            ),
+                          ]),
                         ),
                         const SizedBox(width: 24),
-                        Expanded(
-                          flex: 4,
-                          child: _buildRecentActivities(),
-                        ),
+                        Expanded(flex: 4, child: _buildRecentActivities()),
                       ],
                     )
                   else ...[
-                    _buildMetricRow(
-                      'Weekly Performance',
-                      [
-                        _CompactMetricCard(
-                          title: 'Leads',
-                          value: _metrics!.leadsThisWeek.toString(),
-                          icon: Icons.bolt_rounded,
-                          color: Colors.amber[700]!,
-                        ),
-                        _CompactMetricCard(
-                          title: 'Resolved',
-                          value: _metrics!.ticketsResolvedThisWeek.toString(),
-                          icon: Icons.check_circle_outline_rounded,
-                          // FIX LỖI Ở ĐÂY:
-                          color: Colors.teal[600] ?? Colors.green,
-                        ),
-                        _CompactMetricCard(
-                          title: 'Completed',
-                          value: _metrics!.tasksCompletedThisWeek.toString(),
-                          icon: Icons.done_all_rounded,
-                          color: Colors.indigo[500]!,
-                        ),
-                      ],
-                    ),
+                    _buildMetricRow('Weekly Performance', [
+                      _CompactMetricCard(
+                        title: 'Leads',
+                        value: _metrics!.leadsThisWeek.toString(),
+                        icon: Icons.bolt_rounded,
+                        color: Colors.amber[700]!,
+                      ),
+                      _CompactMetricCard(
+                        title: 'Resolved',
+                        value: _metrics!.ticketsResolvedThisWeek.toString(),
+                        icon: Icons.check_circle_outline_rounded,
+                        // FIX LỖI Ở ĐÂY:
+                        color: Colors.teal[600] ?? Colors.green,
+                      ),
+                      _CompactMetricCard(
+                        title: 'Completed',
+                        value: _metrics!.tasksCompletedThisWeek.toString(),
+                        icon: Icons.done_all_rounded,
+                        color: Colors.indigo[500]!,
+                      ),
+                    ]),
                     const SizedBox(height: 24),
                     _buildRecentActivities(),
                   ],
@@ -333,7 +322,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.blue[600],
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   onPressed: () => _showUserDialog(context),
                   child: const Text('Create'),
@@ -346,33 +336,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return Column(
                 children: [
                   ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     leading: CircleAvatar(
                       radius: 20,
                       backgroundColor: Colors.blue[50],
                       child: Text(
                         u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
                         style: TextStyle(
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.bold),
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    title: Text(u.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(u.email,
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    title: Text(
+                      u.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      u.email,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
                     trailing: AdminOnly(
                       child: IconButton(
-                        icon: Icon(Icons.more_vert,
-                            size: 20, color: Colors.grey[400]),
+                        icon: Icon(
+                          Icons.more_vert,
+                          size: 20,
+                          color: Colors.grey[400],
+                        ),
                         onPressed: () =>
                             _showUserDialog(context, user: u), // Shortcut edit
                       ),
                     ),
                     onTap: () async {
-                      final res = await user_detail.showAdminUserDetailDialog(context, userId: u.id);
+                      final res = await user_detail.showAdminUserDetailDialog(
+                        context,
+                        userId: u.id,
+                      );
                       if (res == true) _loadDashboard();
                     },
                   ),
@@ -410,7 +412,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.deepPurple[500],
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   onPressed: () => _showRoleDialog(context),
                   child: const Text('Create'),
@@ -423,22 +426,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return Column(
                 children: [
                   ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.deepPurple[50],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.lock_outline,
-                          size: 20, color: Colors.deepPurple[400]),
+                      child: Icon(
+                        Icons.lock_outline,
+                        size: 20,
+                        color: Colors.deepPurple[400],
+                      ),
                     ),
-                    title: Text(r.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(r.roleType.value,
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    title: Text(
+                      r.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      r.roleType.value,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
                     onTap: () =>
                         AppRouter.navigateTo(context, AppRouter.adminRoles),
                   ),
@@ -467,11 +478,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           );
         } else {
-          metricsLayout = Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: cards,
-          );
+          metricsLayout = Wrap(spacing: 16, runSpacing: 16, children: cards);
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,9 +486,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(
               sectionTitle,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey[800],
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[800],
+              ),
             ),
             const SizedBox(height: 16),
             metricsLayout,
@@ -503,9 +510,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Text(
           'Recent Activity',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.blueGrey[800],
-              ),
+            fontWeight: FontWeight.bold,
+            color: Colors.blueGrey[800],
+          ),
         ),
         const SizedBox(height: 12),
         Container(
@@ -540,8 +547,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSidebar(
-      {required bool showLogout, required bool showImpersonation}) {
+  Widget _buildSidebar({
+    required bool showLogout,
+    required bool showImpersonation,
+  }) {
     final items = <Widget>[
       Row(
         children: [
@@ -549,19 +558,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: [Colors.blue[800]!, Colors.blue[600]!]),
+                colors: [Colors.blue[800]!, Colors.blue[600]!],
+              ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.dashboard_rounded,
-                color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.dashboard_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           const Text(
             'CRM Dashboard',
             style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B)),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
           ),
         ],
       ),
@@ -572,7 +586,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isSelected: true,
         onTap: () {},
       ),
-      AdminOnly(
+      ManagerOrAdminOnly(
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 12),
           childrenPadding: EdgeInsets.zero,
@@ -583,55 +597,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
           title: const Text('Admin', style: TextStyle(fontSize: 14)),
           children: [
             _SidebarSubItem(
-                label: 'Users',
-                onTap: () =>
-                    AppRouter.navigateTo(context, AppRouter.adminUsers)),
+              label: 'Users',
+              onTap: () => AppRouter.navigateTo(context, AppRouter.adminUsers),
+            ),
             _SidebarSubItem(
-                label: 'Roles',
-                onTap: () =>
-                    AppRouter.navigateTo(context, AppRouter.adminRoles)),
+              label: 'Roles',
+              onTap: () => AppRouter.navigateTo(context, AppRouter.adminRoles),
+            ),
             _SidebarSubItem(
-                label: 'Activity Logs',
-                onTap: () =>
-                    AppRouter.navigateTo(context, AppRouter.activityLogs)),
+              label: 'Activity Logs',
+              onTap: () =>
+                  AppRouter.navigateTo(context, AppRouter.activityLogs),
+            ),
+            _SidebarSubItem(
+              label: 'Customer Orgs',
+              onTap: () =>
+                  AppRouter.navigateTo(context, AppRouter.adminCustomerOrgs),
+            ),
+            _SidebarSubItem(
+              label: 'Domain Mappings',
+              onTap: () =>
+                  AppRouter.navigateTo(context, AppRouter.adminDomainMappings),
+            ),
           ],
         ),
       ),
       _SidebarItem(
-          icon: Icons.people_outline,
-          label: 'Contacts',
-          onTap: () => AppRouter.navigateTo(context, AppRouter.contacts)),
+        icon: Icons.people_outline,
+        label: 'Contacts',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.contacts),
+      ),
       _SidebarItem(
-          icon: Icons.trending_up_rounded,
-          label: 'Leads',
-          onTap: () => AppRouter.navigateTo(context, AppRouter.leads)),
+        icon: Icons.trending_up_rounded,
+        label: 'Leads',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.leads),
+      ),
       _SidebarItem(
-          icon: Icons.task_outlined,
-          label: 'Tasks',
-          onTap: () => AppRouter.navigateTo(context, AppRouter.tasks)),
+        icon: Icons.task_outlined,
+        label: 'Tasks',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.tasks),
+      ),
       _SidebarItem(
-          icon: Icons.confirmation_number_outlined,
-          label: 'Tickets',
-          onTap: () => AppRouter.navigateTo(context, AppRouter.tickets)),
+        icon: Icons.confirmation_number_outlined,
+        label: 'Tickets',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+      ),
       const Spacer(),
       if (showLogout)
         ListTile(
           leading: const Icon(Icons.logout, size: 20, color: Colors.grey),
-          title: const Text('Logout',
-              style: TextStyle(color: Colors.grey, fontSize: 14)),
+          title: const Text(
+            'Logout',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
           onTap: () async {
             await _authService.logout();
             if (mounted) AppRouter.replaceWith(context, AppRouter.login);
           },
-        )
+        ),
     ];
 
     return Container(
       width: 250,
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-      child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: items),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items,
+      ),
     );
   }
 
@@ -675,8 +708,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         value: role,
                         decoration: const InputDecoration(labelText: 'Role'),
                         items: ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']
-                            .map((r) =>
-                                DropdownMenuItem(value: r, child: Text(r)))
+                            .map(
+                              (r) => DropdownMenuItem(value: r, child: Text(r)),
+                            )
                             .toList(),
                         onChanged: (v) => role = v ?? role,
                       ),
@@ -699,8 +733,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('Cancel')),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
                 FilledButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
@@ -717,9 +752,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             locator<AuthService>().selectedOrganizationId;
                         if (orgId == null) return;
                         final res = await _usersService.inviteUser(
-                            orgId: orgId,
-                            email: newUser.email,
-                            role: newUser.role ?? 'VIEWER');
+                          orgId: orgId,
+                          email: newUser.email,
+                          role: newUser.role ?? 'VIEWER',
+                        );
                         if (res.isSuccess) {
                           Navigator.of(dialogCtx).pop();
                           _loadDashboard();
@@ -739,8 +775,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       }
                     }
                   },
-                  child:
-                      Text(isNew ? (sendInvite ? 'Invite' : 'Create') : 'Save'),
+                  child: Text(
+                    isNew ? (sendInvite ? 'Invite' : 'Create') : 'Save',
+                  ),
                 ),
               ],
             );
@@ -771,14 +808,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextFormField(
-                          controller: nameCtrl,
-                          decoration:
-                              const InputDecoration(labelText: 'Name')),
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                      ),
                       const SizedBox(height: 8),
                       TextFormField(
-                          controller: descCtrl,
-                          decoration:
-                              const InputDecoration(labelText: 'Description')),
+                        controller: descCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                        ),
+                      ),
                       // ... (Keep existing role logic condensed for brevity)
                     ],
                   ),
@@ -786,14 +825,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('Cancel')),
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
                 FilledButton(
-                    onPressed: () async {
-                      // Mock implementation to preserve flow
-                      Navigator.of(dialogCtx).pop();
-                    },
-                    child: const Text('Save')),
+                  onPressed: () async {
+                    // Mock implementation to preserve flow
+                    Navigator.of(dialogCtx).pop();
+                  },
+                  child: const Text('Save'),
+                ),
               ],
             );
           },
@@ -823,7 +864,7 @@ class _DashboardHeader extends StatelessWidget {
         gradient: const LinearGradient(
           colors: [
             Color(0xFF1E293B),
-            Color(0xFF334155)
+            Color(0xFF334155),
           ], // Slate 800 -> Slate 700
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -834,7 +875,7 @@ class _DashboardHeader extends StatelessWidget {
             color: const Color(0xFF1E293B).withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
@@ -885,8 +926,11 @@ class _DashboardHeader extends StatelessWidget {
               color: Colors.white.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.bar_chart_rounded,
-                size: 64, color: Colors.white),
+            child: const Icon(
+              Icons.bar_chart_rounded,
+              size: 64,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
@@ -895,8 +939,11 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _HeaderMetricChip extends StatelessWidget {
-  const _HeaderMetricChip(
-      {required this.label, required this.value, required this.icon});
+  const _HeaderMetricChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -915,12 +962,18 @@ class _HeaderMetricChip extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.white, size: 16),
           const SizedBox(width: 8),
-          Text(value,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(color: Colors.blueGrey[100], fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(color: Colors.blueGrey[100], fontSize: 12),
+          ),
         ],
       ),
     );
@@ -1020,18 +1073,15 @@ class _DashboardCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         children: [
-          Container(
-            height: 4,
-            width: double.infinity,
-            color: accent,
-          ),
+          Container(height: 4, width: double.infinity, color: accent),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -1043,9 +1093,10 @@ class _DashboardCard extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Color(0xFF1E293B)),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF1E293B),
+                      ),
                     ),
                     const Spacer(),
                     if (trailing != null) trailing!,
@@ -1072,8 +1123,10 @@ class _SidebarSubItem extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 54),
       dense: true,
-      title:
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+      title: Text(
+        label,
+        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+      ),
       onTap: onTap,
     );
   }
@@ -1085,11 +1138,12 @@ class _SidebarItem extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _SidebarItem(
-      {required this.icon,
-      required this.label,
-      this.isSelected = false,
-      required this.onTap});
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    this.isSelected = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1098,15 +1152,18 @@ class _SidebarItem extends StatelessWidget {
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         tileColor: isSelected ? const Color(0xFFEFF6FF) : null, // Xanh rất nhạt
-        leading: Icon(icon,
-            color: isSelected ? Colors.blue[700] : Colors.blueGrey[400],
-            size: 22),
+        leading: Icon(
+          icon,
+          color: isSelected ? Colors.blue[700] : Colors.blueGrey[400],
+          size: 22,
+        ),
         title: Text(
           label,
           style: TextStyle(
-              color: isSelected ? Colors.blue[700] : Colors.blueGrey[700],
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 14),
+            color: isSelected ? Colors.blue[700] : Colors.blueGrey[700],
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 14,
+          ),
         ),
         onTap: onTap,
       ),
@@ -1115,11 +1172,12 @@ class _SidebarItem extends StatelessWidget {
 }
 
 class _ActivityTimelineTile extends StatelessWidget {
-  const _ActivityTimelineTile(
-      {required this.log,
-      required this.isFirst,
-      required this.isLast,
-      required this.onTap});
+  const _ActivityTimelineTile({
+    required this.log,
+    required this.isFirst,
+    required this.isLast,
+    required this.onTap,
+  });
   final ActivityLog log;
   final bool isFirst;
   final bool isLast;
@@ -1127,33 +1185,48 @@ class _ActivityTimelineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Column(children: [
-        Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-                color: Colors.blue[300], shape: BoxShape.circle)),
-        if (!isLast) Container(width: 2, height: 40, color: Colors.grey[200]),
-      ]),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.blue[300],
+                shape: BoxShape.circle,
+              ),
+            ),
+            if (!isLast)
+              Container(width: 2, height: 40, color: Colors.grey[200]),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    log.description.isNotEmpty
-                        ? log.description
-                        : log.activityType.value,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 13)),
-                Text('${log.userName ?? 'System'} • 2 mins ago',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-              ]),
+                  log.description.isNotEmpty
+                      ? log.description
+                      : log.activityType.value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  '${log.userName ?? 'System'} • 2 mins ago',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                ),
+              ],
+            ),
+          ),
         ),
-      )
-    ]);
+      ],
+    );
   }
 }
