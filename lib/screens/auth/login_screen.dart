@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/api/api_config.dart';
+import '../../navigation/app_router.dart';
 // Giả định bạn đã có widget này, nếu chưa hãy dùng code cũ hoặc placeholder
 import '../../widgets/web_google_sign_in_button.dart'; 
 
@@ -500,6 +501,52 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             )
           ],
+        ),
+        
+        const SizedBox(height: 24),
+        
+        // Customer Portal Link
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.support_agent, size: 18, color: _accentColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Looking for customer support?',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  AppRouter.navigateTo(context, AppRouter.customerLogin);
+                },
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text('Customer Portal'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _accentColor,
+                  side: BorderSide(color: _accentColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

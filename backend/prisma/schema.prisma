@@ -17,6 +17,8 @@ model User {
   name         String
   profileImage String?
   googleId     String?  @unique // For Google OAuth
+  passwordHash String?  // For customer password authentication
+  type         UserType @default(STAFF) // STAFF or CUSTOMER
   isActive     Boolean  @default(true)
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
@@ -29,10 +31,12 @@ model User {
   ownedTasks         Task[]             @relation("TaskOwner")
   createdTasks       Task[]             @relation("TaskCreator")
   activities         ActivityLog[]
-  tickets            Ticket[]
+  ownedTickets       Ticket[]           @relation("TicketOwner")
+  customerTickets    Ticket[]           @relation("CustomerTickets")
   ticketMessages     TicketMessage[]
   attachments        Attachment[]
   createdInvitations Invitation[]
+  customerProfile    CustomerProfile?
 
   @@map("users")
 }
@@ -51,16 +55,18 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  users       UserOrganization[]
-  contacts    Contact[]
-  leads       Lead[]
-  tasks       Task[]
-  accounts    Account[]
-  roles       UserRole[]
-  activities  ActivityLog[]
-  tickets     Ticket[]
-  attachments Attachment[]
-  invitations Invitation[]
+  users            UserOrganization[]
+  contacts         Contact[]
+  leads            Lead[]
+  tasks            Task[]
+  accounts         Account[]
+  roles            UserRole[]
+  activities       ActivityLog[]
+  tickets          Ticket[]
+  attachments      Attachment[]
+  invitations      Invitation[]
+  customerProfiles CustomerProfile[]
+  domainMappings   OrganizationDomain[]
 
   @@map("organizations")
 }
@@ -244,16 +250,24 @@ model Ticket {
   status         TicketStatus   @default(OPEN)
   priority       TicketPriority @default(NORMAL)
   category       String?
-  ownerId        String?
-  organizationId String
+  ownerId        String?        // Staff member assigned to the ticket
+  customerId     String?        // Customer who submitted the ticket
+  organizationId String         // Organization that owns this ticket
+  slaDeadline    DateTime?      // SLA response/resolution deadline
+  respondedAt    DateTime?      // First response timestamp
+  resolvedAt     DateTime?      // Resolution timestamp
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   // Relations
-  owner        User?           @relation(fields: [ownerId], references: [id])
+  owner        User?           @relation("TicketOwner", fields: [ownerId], references: [id])
+  customer     User?           @relation("CustomerTickets", fields: [customerId], references: [id])
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages     TicketMessage[]
 
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([status])
   @@map("tickets")
 }
 
@@ -274,6 +288,11 @@ model TicketMessage {
 }
 
 // Enums
+enum UserType {
+  STAFF
+  CUSTOMER
+}
+
 enum UserRoleType {
   ADMIN
   MANAGER
@@ -396,3 +415,51 @@ model Invitation {
 
   @@map("invitations")
 }
+
+// CustomerProfile model - customer-specific profile data
+model CustomerProfile {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  organizationId String?       // Link to organization (auto-matched or assigned)
+  companyName    String?       // Customer's company name (for reference)
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?
+  isActive       Boolean       @default(true)
+  assignedAt     DateTime?     // When customer was assigned to organization
+  assignedBy     String?       // Admin who assigned (userId)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([companyName])
+  @@map("customer_profiles")
+}
+
+// OrganizationDomain model - configurable domain auto-assignment rules
+model OrganizationDomain {
+  id             String       @id @default(cuid())
+  organizationId String
+  domain         String       @unique // e.g., "acme.com", "techstart.io"
+  isActive       Boolean      @default(true)
+  autoAssign     Boolean      @default(true) // Enable/disable auto-assignment
+  priority       Int          @default(0) // For conflict resolution
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([domain])
+  @@index([organizationId])
+  @@map("organization_domains")
+}
+

@@ -5,11 +5,6 @@ import '../../services/leads_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
-class LeadEditArgs {
-  const LeadEditArgs({required this.leadId});
-  final String leadId;
-}
-
 class LeadEditScreen extends StatefulWidget {
   final String leadId;
   const LeadEditScreen({super.key, required this.leadId});

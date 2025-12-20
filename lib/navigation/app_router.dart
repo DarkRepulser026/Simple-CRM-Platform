@@ -23,6 +23,8 @@ import '../screens/admin/invite_user_screen.dart';
 import '../screens/admin/invitations_screen.dart';
 import '../screens/admin/roles_list_screen.dart';
 import '../screens/admin/activity_logs_screen.dart';
+import '../screens/admin/customer_organization_screen.dart';
+import '../screens/admin/domain_mapping_screen.dart';
 // unused: '../screens/access_denied_screen.dart';
 import '../screens/access_denied_redirect_screen.dart';
 import 'route_guards.dart';
@@ -37,6 +39,15 @@ import '../screens/tickets/tickets_list_screen.dart';
 import '../screens/tickets/ticket_create_screen.dart';
 import '../screens/tickets/ticket_detail_screen.dart';
 import '../screens/tickets/ticket_edit_screen.dart';
+import '../screens/customer_portal/auth/customer_login_screen.dart';
+import '../screens/customer_portal/auth/customer_register_screen.dart';
+import '../screens/customer_portal/customer_portal_screen.dart';
+import '../screens/customer_portal/tickets/customer_tickets_list_screen.dart';
+import '../screens/customer_portal/tickets/customer_ticket_detail_screen.dart';
+import '../screens/customer_portal/tickets/create_ticket_screen.dart';
+import '../screens/customer_portal/profile/customer_profile_screen.dart';
+import '../screens/customer_portal/profile/customer_edit_profile_screen.dart';
+import '../screens/customer_portal/profile/customer_change_password_screen.dart';
 
 /// ===== CUSTOM PAGE TRANSITIONS =====
 /// Smooth fade transition for better UX
@@ -146,6 +157,31 @@ class ActivityLogsArgs {
   final String? search;
 }
 
+class TicketEditArgs {
+  const TicketEditArgs({required this.ticketId});
+  final String ticketId;
+}
+
+class AccountDetailArgs {
+  const AccountDetailArgs({required this.accountId});
+  final String accountId;
+}
+
+class LeadEditArgs {
+  const LeadEditArgs({required this.leadId});
+  final String leadId;
+}
+
+class ContactEditArgs {
+  const ContactEditArgs({required this.contactId});
+  final String contactId;
+}
+
+class CustomerTicketDetailArgs {
+  const CustomerTicketDetailArgs({required this.ticketId});
+  final int ticketId;
+}
+
 /// Central route registry with typed navigation
 class AppRouter {
   static const String login = '/login';
@@ -178,11 +214,24 @@ class AppRouter {
     static const String adminInvitations = '/admin/invitations';
   static const String adminRoles = '/admin/roles';
   static const String activityLogs = '/admin/activity-logs';
+  static const String adminCustomerOrgs = '/admin/customer-organizations';
+  static const String adminDomainMappings = '/admin/domain-mappings';
   static const String interactions = '/interactions';
   static const String tasks = '/tasks';
   static const String taskCreate = '/task-create';
   static const String taskDetail = '/task-detail';
   static const String taskEdit = '/task-edit';
+  
+  // Customer Portal routes
+  static const String customerLogin = '/customer-login';
+  static const String customerRegister = '/customer-register';
+  static const String customerPortal = '/customer-portal';
+  static const String customerTickets = '/customer-tickets';
+  static const String customerTicketDetail = '/customer-ticket-detail';
+  static const String customerTicketCreate = '/customer-ticket-create';
+  static const String customerProfile = '/customer-profile';
+  static const String customerEditProfile = '/customer-edit-profile';
+  static const String customerChangePassword = '/customer-change-password';
 
   /// Navigate to a route with optional arguments
   static Future<T?> navigateTo<T>(
@@ -238,8 +287,20 @@ class AppRouter {
       adminRoles: (context) => adminGuarded((c) => const RolesListScreen())(context),
       adminInvitations: (context) => managerOrAdminGuarded((c) => const InvitationsScreen())(context),
       activityLogs: (context) => adminGuarded((c) => const ActivityLogsScreen())(context),
+      adminCustomerOrgs: (context) => managerOrAdminGuarded((c) => const CustomerOrganizationScreen())(context),
+      adminDomainMappings: (context) => managerOrAdminGuarded((c) => const DomainMappingScreen())(context),
       interactions: (context) => const InteractionsListScreen(),
       contactCreate: (context) => const ContactCreateScreen(),
+      
+      // Customer Portal routes
+      customerLogin: (context) => const CustomerLoginScreen(),
+      customerRegister: (context) => const CustomerRegisterScreen(),
+      customerPortal: (context) => const CustomerPortalScreen(),
+      customerTickets: (context) => const CustomerTicketsListScreen(),
+      customerTicketCreate: (context) => const CreateTicketScreen(),
+      customerProfile: (context) => const CustomerProfileScreen(),
+      customerEditProfile: (context) => const CustomerEditProfileScreen(),
+      customerChangePassword: (context) => const CustomerChangePasswordScreen(),
       // contactDetail: (context) => const ContactDetailScreen(),
       // leadCreate: (context) => const LeadCreateScreen(),
       // leadDetail: (context) => const LeadDetailScreen(),
@@ -346,8 +407,14 @@ class AppRouter {
           return SlideRoute<Object?>(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
         }
         break;
-        case adminInvite:
-          return FadeRoute<Object?>(builder: (context) => const InviteUserScreen());
+      case customerTicketDetail:
+        final args = settings.arguments as CustomerTicketDetailArgs?;
+        if (args != null) {
+          return SlideRoute<Object?>(builder: (context) => CustomerTicketDetailScreen(ticketId: args.ticketId));
+        }
+        break;
+      case adminInvite:
+        return FadeRoute<Object?>(builder: (context) => const InviteUserScreen());
       
     }
     return null;

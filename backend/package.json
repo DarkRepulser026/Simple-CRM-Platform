@@ -15,7 +15,8 @@
     "seed-large": "node scripts/seed-large-sample-data.js",
     "seed-clean": "node scripts/seed-clean.js",
     "server:test": "node scripts/test-start.js",
-    "test": "mocha --timeout 20000 \"test/**/*.js\""
+    "test": "cross-env NODE_ENV=test mocha --timeout 20000 \"test/**/*.mjs\"",
+    "test:watch": "cross-env NODE_ENV=test mocha --timeout 20000 --watch \"test/**/*.mjs\""
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "express-session": "^1.17.3",
     "jsonwebtoken": "^9.0.2",
     "multer": "2.0.2",
@@ -37,11 +39,13 @@
     "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
+    "@types/supertest": "^6.0.3",
+    "chai": "^4.3.7",
+    "cross-env": "^7.0.3",
+    "mocha": "^10.2.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.18.0",
-    "mocha": "^10.2.0",
-    "chai": "^4.3.7",
-    "cross-env": "^7.0.3"
+    "supertest": "^7.1.4"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

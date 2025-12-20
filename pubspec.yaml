@@ -24,6 +24,7 @@ dependencies:
   package_info_plus: ^8.0.2
   shared_preferences: ^2.2.2
   fl_chart: ^1.1.1
+  file_picker: ^10.3.8
 
 dev_dependencies:
   equatable: ^2.0.5

@@ -14,6 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
+import { registerCustomer, loginCustomer, refreshAccessToken, invalidateUserTokens, verifyCustomerUser } from './lib/customerAuth.js';
+import { verifyCustomerToken, requireCustomer } from './lib/customerMiddleware.js';
 
 dotenv.config();
 
@@ -372,6 +375,963 @@ const validateAccount = (req, res, next) => {
 };
 
 // Routes
+
+// Rate limiter for customer auth endpoints (5 attempts per 15 minutes)
+// Disabled in test environment
+const baseRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: 'Too many authentication attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Wrapper that checks NODE_ENV at runtime
+const customerAuthLimiter = (req, res, next) => {
+  if (process.env.NODE_ENV === 'test') {
+    return next();
+  }
+  return baseRateLimiter(req, res, next);
+};
+
+console.log(`[Rate Limiter] Initial NODE_ENV=${process.env.NODE_ENV}`);
+
+// ====================
+// CUSTOMER PORTAL ROUTES
+// ====================
+
+// Customer Authentication Routes
+// POST /api/external/auth/register - Register new customer
+app.post('/api/external/auth/register', customerAuthLimiter, async (req, res) => {
+  try {
+    const { email, password, name, companyName, phone } = req.body;
+    
+    const result = await registerCustomer({
+      email,
+      password,
+      name,
+      companyName,
+      phone
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Customer registration error:', error);
+    
+    if (error.message === 'User with this email already exists') {
+      return res.status(409).json({ error: error.message });
+    }
+    
+    if (error.message.includes('required')) {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
+// POST /api/external/auth/login - Login customer
+app.post('/api/external/auth/login', customerAuthLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const result = await loginCustomer({ email, password });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Customer login error:', error);
+    
+    if (error.message === 'Invalid email or password' || 
+        error.message.includes('inactive')) {
+      return res.status(401).json({ error: error.message });
+    }
+    
+    if (error.message.includes('required')) {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Login failed. Please try again.' });
+  }
+});
+
+// POST /api/external/auth/refresh - Refresh access token
+app.post('/api/external/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required' });
+    }
+    
+    const result = await refreshAccessToken(refreshToken);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    
+    if (error.message.includes('Invalid') || 
+        error.message.includes('expired') ||
+        error.message.includes('invalidated')) {
+      return res.status(401).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Token refresh failed. Please try again.' });
+  }
+});
+
+// POST /api/external/auth/logout - Logout customer (invalidate all tokens)
+app.post('/api/external/auth/logout', requireCustomer, async (req, res) => {
+  try {
+    await invalidateUserTokens(req.userId);
+    
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Logout failed. Please try again.' });
+  }
+});
+
+// GET /api/external/auth/verify - Verify current token
+app.get('/api/external/auth/verify', requireCustomer, async (req, res) => {
+  try {
+    // If we get here, the token is valid (verified by middleware)
+    res.json({
+      isValid: true,
+      user: req.user
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// Customer Ticket Management Endpoints
+
+// Helper function to generate ticket number
+function generateTicketNumber(organizationId) {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `TICKET-${timestamp}-${random}`;
+}
+
+// GET /api/external/tickets - Get customer's tickets with pagination
+app.get('/api/external/tickets', requireCustomer, async (req, res) => {
+  try {
+    const { status, priority, page = '1', limit = '20' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where = {
+      customerId: req.userId
+    };
+
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    if (priority) {
+      where.priority = priority.toUpperCase();
+    }
+
+    // Get tickets with pagination
+    const [tickets, total] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          messages: {
+            where: {
+              isInternal: false
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              content: true,
+              createdAt: true
+            }
+          }
+        }
+      }),
+      prisma.ticket.count({ where })
+    ]);
+
+    res.json({
+      tickets,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Get tickets error:', error);
+    res.status(500).json({ error: 'Failed to retrieve tickets' });
+  }
+});
+
+// POST /api/external/tickets - Create new ticket
+app.post('/api/external/tickets', requireCustomer, async (req, res) => {
+  try {
+    const { subject, description, priority = 'NORMAL', category } = req.body;
+
+    // Validation
+    if (!subject || !description) {
+      return res.status(400).json({ error: 'Subject and description are required' });
+    }
+
+    // Get customer's organization (or use a default one)
+    // For now, we'll get the first organization or create a default customer organization
+    let organizationId;
+    const userOrg = await prisma.userOrganization.findFirst({
+      where: { userId: req.userId }
+    });
+
+    if (userOrg) {
+      organizationId = userOrg.organizationId;
+    } else {
+      // Create or get default customer organization
+      let defaultOrg = await prisma.organization.findFirst({
+        where: { name: 'Customer Portal' }
+      });
+
+      if (!defaultOrg) {
+        defaultOrg = await prisma.organization.create({
+          data: {
+            name: 'Customer Portal',
+            description: 'Default organization for customer portal tickets'
+          }
+        });
+      }
+
+      organizationId = defaultOrg.id;
+    }
+
+    // Generate ticket number
+    const ticketNumber = generateTicketNumber(organizationId);
+
+    // Create ticket
+    const ticket = await prisma.ticket.create({
+      data: {
+        subject,
+        description,
+        priority: priority.toUpperCase(),
+        category: category || null,
+        status: 'OPEN',
+        customerId: req.userId,
+        organizationId,
+        // Store ticket number in subject or add a new field if needed
+      },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    // TODO: Send confirmation email to customer
+    // await mailer.sendTicketConfirmation(req.user.email, ticket);
+
+    res.status(201).json({
+      ticketId: ticket.id,
+      number: ticketNumber,
+      status: ticket.status,
+      ticket
+    });
+  } catch (error) {
+    console.error('Create ticket error:', error);
+    res.status(500).json({ error: 'Failed to create ticket' });
+  }
+});
+
+// GET /api/external/tickets/:id - Get ticket details
+app.get('/api/external/tickets/:id', requireCustomer, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        messages: {
+          where: {
+            isInternal: false
+          },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                type: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Verify customer owns ticket
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to access this ticket' });
+    }
+
+    res.json(ticket);
+  } catch (error) {
+    console.error('Get ticket detail error:', error);
+    res.status(500).json({ error: 'Failed to retrieve ticket details' });
+  }
+});
+
+// PUT /api/external/tickets/:id - Update ticket (limited fields)
+app.put('/api/external/tickets/:id', requireCustomer, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { subject, description, priority } = req.body;
+
+    // Get ticket first
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Verify customer owns ticket
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to update this ticket' });
+    }
+
+    // Only allow updates if status is OPEN
+    if (ticket.status !== 'OPEN') {
+      return res.status(403).json({ error: 'Only open tickets can be edited' });
+    }
+
+    // Build update data
+    const updateData = {};
+    if (subject) updateData.subject = subject;
+    if (description) updateData.description = description;
+    if (priority) updateData.priority = priority.toUpperCase();
+
+    // Update ticket
+    const updatedTicket = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: updateData,
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    res.json(updatedTicket);
+  } catch (error) {
+    console.error('Update ticket error:', error);
+    res.status(500).json({ error: 'Failed to update ticket' });
+  }
+});
+
+// Customer Ticket Message Endpoints
+
+// GET /api/external/tickets/:id/messages - Get ticket messages
+app.get('/api/external/tickets/:id/messages', requireCustomer, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { page = '1', limit = '20' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Verify ticket exists and customer owns it
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to access this ticket' });
+    }
+
+    // Get messages (exclude internal notes)
+    const [messages, total] = await Promise.all([
+      prisma.ticketMessage.findMany({
+        where: {
+          ticketId,
+          isInternal: false
+        },
+        orderBy: { createdAt: 'asc' },
+        skip,
+        take: limitNum,
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              type: true
+            }
+          }
+        }
+      }),
+      prisma.ticketMessage.count({
+        where: {
+          ticketId,
+          isInternal: false
+        }
+      })
+    ]);
+
+    res.json({
+      messages,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({ error: 'Failed to retrieve messages' });
+  }
+});
+
+// POST /api/external/tickets/:id/messages - Add message to ticket
+app.post('/api/external/tickets/:id/messages', requireCustomer, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { content } = req.body;
+
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    // Verify ticket exists and customer owns it
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to add messages to this ticket' });
+    }
+
+    // Create message
+    const message = await prisma.ticketMessage.create({
+      data: {
+        content: content.trim(),
+        isInternal: false,
+        ticketId,
+        authorId: req.userId
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            type: true
+          }
+        }
+      }
+    });
+
+    // Update ticket timestamp
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { updatedAt: new Date() }
+    });
+
+    // TODO: Notify assigned agent
+    // if (ticket.ownerId) {
+    //   await mailer.sendNewMessageNotification(ticket.ownerId, ticket, message);
+    // }
+
+    res.status(201).json({
+      messageId: message.id,
+      createdAt: message.createdAt,
+      message
+    });
+  } catch (error) {
+    console.error('Create message error:', error);
+    res.status(500).json({ error: 'Failed to add message' });
+  }
+});
+
+// PUT /api/external/tickets/:id/messages/:msgId - Update message
+app.put('/api/external/tickets/:id/messages/:msgId', requireCustomer, async (req, res) => {
+  try {
+    const { id: ticketId, msgId } = req.params;
+    const { content } = req.body;
+
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    // Get message
+    const message = await prisma.ticketMessage.findUnique({
+      where: { id: msgId },
+      include: {
+        ticket: true
+      }
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Verify customer owns the message
+    if (message.authorId !== req.userId) {
+      return res.status(403).json({ error: 'You can only edit your own messages' });
+    }
+
+    // Verify customer owns the ticket
+    if (message.ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to access this ticket' });
+    }
+
+    // Check if message was created within 15 minutes
+    const messageAge = Date.now() - new Date(message.createdAt).getTime();
+    const fifteenMinutes = 15 * 60 * 1000;
+
+    if (messageAge > fifteenMinutes) {
+      return res.status(403).json({ error: 'Messages can only be edited within 15 minutes of creation' });
+    }
+
+    // Update message
+    const updatedMessage = await prisma.ticketMessage.update({
+      where: { id: msgId },
+      data: { content: content.trim() },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            type: true
+          }
+        }
+      }
+    });
+
+    res.json(updatedMessage);
+  } catch (error) {
+    console.error('Update message error:', error);
+    res.status(500).json({ error: 'Failed to update message' });
+  }
+});
+
+// Customer Profile Endpoints
+
+// GET /api/external/profile - Get customer profile
+app.get('/api/external/profile', requireCustomer, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      include: {
+        customerProfile: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      type: user.type,
+      profile: user.customerProfile
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Failed to retrieve profile' });
+  }
+});
+
+// PUT /api/external/profile - Update customer profile
+app.put('/api/external/profile', requireCustomer, async (req, res) => {
+  try {
+    const { name, phone, companyName, address, city, state, postalCode, country } = req.body;
+
+    // Update user name if provided
+    const updateData = {};
+    if (name) updateData.name = name;
+
+    if (Object.keys(updateData).length > 0) {
+      await prisma.user.update({
+        where: { id: req.userId },
+        data: updateData
+      });
+    }
+
+    // Update or create customer profile
+    const profileData = {};
+    if (phone !== undefined) profileData.phone = phone;
+    if (companyName !== undefined) profileData.companyName = companyName;
+    if (address !== undefined) profileData.address = address;
+    if (city !== undefined) profileData.city = city;
+    if (state !== undefined) profileData.state = state;
+    if (postalCode !== undefined) profileData.postalCode = postalCode;
+    if (country !== undefined) profileData.country = country;
+
+    let profile;
+    if (Object.keys(profileData).length > 0) {
+      profile = await prisma.customerProfile.upsert({
+        where: { userId: req.userId },
+        create: {
+          userId: req.userId,
+          ...profileData
+        },
+        update: profileData
+      });
+    } else {
+      profile = await prisma.customerProfile.findUnique({
+        where: { userId: req.userId }
+      });
+    }
+
+    // Get updated user
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      include: {
+        customerProfile: true
+      }
+    });
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      type: user.type,
+      profile: user.customerProfile
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// PUT /api/external/profile/password - Change password
+app.put('/api/external/profile/password', requireCustomer, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters long' });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId }
+    });
+
+    if (!user || !user.passwordHash) {
+      return res.status(400).json({ error: 'Cannot change password for this account' });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+    // Update password and increment token version to invalidate all sessions
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        passwordHash: newPasswordHash,
+        tokenVersion: {
+          increment: 1
+        }
+      }
+    });
+
+    res.json({ success: true, message: 'Password changed successfully. Please log in again.' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// GET /api/external/profile/tickets-summary - Get tickets summary
+app.get('/api/external/profile/tickets-summary', requireCustomer, async (req, res) => {
+  try {
+    const [totalCount, openCount, resolvedCount, closedCount] = await Promise.all([
+      prisma.ticket.count({
+        where: { customerId: req.userId }
+      }),
+      prisma.ticket.count({
+        where: { customerId: req.userId, status: 'OPEN' }
+      }),
+      prisma.ticket.count({
+        where: { customerId: req.userId, status: 'RESOLVED' }
+      }),
+      prisma.ticket.count({
+        where: { customerId: req.userId, status: 'CLOSED' }
+      })
+    ]);
+
+    res.json({
+      totalCount,
+      openCount,
+      resolvedCount,
+      closedCount,
+      inProgressCount: totalCount - openCount - resolvedCount - closedCount
+    });
+  } catch (error) {
+    console.error('Get tickets summary error:', error);
+    res.status(500).json({ error: 'Failed to retrieve tickets summary' });
+  }
+});
+
+// Customer Attachment Endpoints
+
+// POST /api/external/tickets/:id/attachments - Upload attachment
+app.post('/api/external/tickets/:id/attachments', requireCustomer, upload.single('file'), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Verify ticket exists and customer owns it
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    if (ticket.customerId !== req.userId) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: 'You do not have permission to add attachments to this ticket' });
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'File size must not exceed 10MB' });
+    }
+
+    // Validate file type
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain'
+    ];
+
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'File type not allowed. Allowed types: PDF, images, Word, Excel, text files' });
+    }
+
+    // Create attachment record
+    const attachment = await prisma.attachment.create({
+      data: {
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        url: `/uploads/${req.file.filename}`,
+        size: req.file.size,
+        uploadedBy: req.userId,
+        entityType: 'ticket',
+        entityId: ticketId,
+        organizationId: ticket.organizationId
+      }
+    });
+
+    res.status(201).json({
+      attachmentId: attachment.id,
+      url: attachment.url,
+      size: attachment.size,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType
+    });
+  } catch (error) {
+    console.error('Upload attachment error:', error);
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: 'Failed to upload attachment' });
+  }
+});
+
+// DELETE /api/external/tickets/:id/attachments/:attachmentId - Delete attachment
+app.delete('/api/external/tickets/:id/attachments/:attachmentId', requireCustomer, async (req, res) => {
+  try {
+    const { id: ticketId, attachmentId } = req.params;
+
+    // Get attachment
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId }
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: 'Attachment not found' });
+    }
+
+    // Verify ticket exists and customer owns it
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to delete attachments from this ticket' });
+    }
+
+    // Verify attachment belongs to this ticket
+    if (attachment.entityId !== ticketId || attachment.entityType !== 'ticket') {
+      return res.status(403).json({ error: 'Attachment does not belong to this ticket' });
+    }
+
+    // Verify customer uploaded the attachment
+    if (attachment.uploadedBy !== req.userId) {
+      return res.status(403).json({ error: 'You can only delete your own attachments' });
+    }
+
+    // Delete file from filesystem
+    const filePath = path.join(process.cwd(), 'uploads', path.basename(attachment.url));
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Delete attachment record
+    await prisma.attachment.delete({
+      where: { id: attachmentId }
+    });
+
+    res.json({ success: true, message: 'Attachment deleted successfully' });
+  } catch (error) {
+    console.error('Delete attachment error:', error);
+    res.status(500).json({ error: 'Failed to delete attachment' });
+  }
+});
+
+// GET /api/external/tickets/:id/attachments/:attachmentId - Download attachment
+app.get('/api/external/tickets/:id/attachments/:attachmentId', requireCustomer, async (req, res) => {
+  try {
+    const { id: ticketId, attachmentId } = req.params;
+
+    // Get attachment
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId }
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: 'Attachment not found' });
+    }
+
+    // Verify ticket exists and customer owns it
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    if (ticket.customerId !== req.userId) {
+      return res.status(403).json({ error: 'You do not have permission to access attachments from this ticket' });
+    }
+
+    // Verify attachment belongs to this ticket
+    if (attachment.entityId !== ticketId || attachment.entityType !== 'ticket') {
+      return res.status(403).json({ error: 'Attachment does not belong to this ticket' });
+    }
+
+    // Get file path
+    const filePath = path.join(process.cwd(), 'uploads', path.basename(attachment.url));
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+
+    // Send file
+    res.download(filePath, attachment.filename);
+  } catch (error) {
+    console.error('Download attachment error:', error);
+    res.status(500).json({ error: 'Failed to download attachment' });
+  }
+});
+
+// ====================
+// END CUSTOMER PORTAL ROUTES
+// ====================
 
 // Auth routes
 // Initiate Google OAuth (for web clients)

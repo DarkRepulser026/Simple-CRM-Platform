@@ -1,4 +1,4 @@
-import { spawnServer, waitForHealth, stopServer, createAdminUserAndOrg, createOrganization } from './_setup.js';
+import { spawnServer, waitForHealth, stopServer, createAdminUserAndOrg, createOrganization } from './_setup.mjs';
 import fetch from 'node-fetch';
 import { expect } from 'chai';
 

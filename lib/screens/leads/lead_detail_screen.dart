@@ -3,15 +3,9 @@ import '../../models/lead.dart';
 import '../../services/service_locator.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/role_visibility.dart';
-import 'lead_edit_screen.dart';
 import '../../services/leads_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
-
-class LeadDetailArgs {
-  const LeadDetailArgs({required this.leadId});
-  final String leadId;
-}
 
 class LeadDetailScreen extends StatefulWidget {
   final String leadId;
