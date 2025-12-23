@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Wraps SharedPreferences for persistent storage
 class SecureStorage {
   static const String _tokenKey = 'jwt_token';
+  static const String _refreshTokenKey = 'refresh_token';
   static const String _userKey = 'current_user';
   static const String _organizationKey = 'selected_organization';
   static const String _originalTokenKey = 'original_token';
@@ -31,6 +32,21 @@ class SecureStorage {
   /// Clear JWT token
   Future<void> clearToken() async {
     await _prefs.remove(_tokenKey);
+  }
+
+  /// Save refresh token
+  Future<void> saveRefreshToken(String token) async {
+    await _prefs.setString(_refreshTokenKey, token);
+  }
+
+  /// Read refresh token
+  Future<String?> readRefreshToken() async {
+    return _prefs.getString(_refreshTokenKey);
+  }
+
+  /// Clear refresh token
+  Future<void> clearRefreshToken() async {
+    await _prefs.remove(_refreshTokenKey);
   }
 
   /// Save current user data as JSON string
@@ -66,6 +82,7 @@ class SecureStorage {
   /// Clear all auth-related data
   Future<void> clearAll() async {
     await clearToken();
+    await clearRefreshToken();
     await clearUser();
     await clearOrganization();
     await clearOriginalToken();

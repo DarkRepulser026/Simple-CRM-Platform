@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../navigation/app_router.dart';
+import '../../../services/service_locator.dart';
+import '../../../services/auth/customer_auth_service.dart';
+import '../../../services/api/api_exceptions.dart';
+import '../../../models/customer_auth.dart';
 
 class CustomerRegisterScreen extends StatefulWidget {
   const CustomerRegisterScreen({super.key});
@@ -16,7 +20,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _companyController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -69,31 +73,88 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
     });
 
     try {
-      // TODO: Call customer auth service
-      // await customerAuthService.register(
-      //   name: _nameController.text.trim(),
-      //   email: _emailController.text.trim(),
-      //   password: _passwordController.text,
-      //   companyName: _companyController.text.trim(),
-      //   phone: _phoneController.text.trim(),
-      // );
+      final authService = locator<CustomerAuthService>();
 
-      if (mounted) {
+      final request = RegisterRequest(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        companyName: _companyController.text.trim().isEmpty
+            ? null
+            : _companyController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+      );
+
+      final result = await authService.register(request);
+
+      if (!mounted) return;
+
+      if (result.isSuccess) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please sign in.'),
+            content: Text('Registration successful! Welcome!'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
-        // Navigate to login screen
-        AppRouter.replaceWith(context, AppRouter.customerLogin);
+        // Navigate to customer portal
+        AppRouter.replaceWith(context, AppRouter.customerPortal);
+      } else {
+        // Handle specific error cases
+        String errorMsg = result.error.message;
+
+        // Check for specific error types
+        if (result.error.message.toLowerCase().contains('already exists') ||
+            result.error.message.toLowerCase().contains('already registered')) {
+          errorMsg =
+              'This email is already registered. Please use a different email or sign in.';
+        } else if (result.error is HttpError) {
+          final httpError = result.error as HttpError;
+          if (httpError.statusCode == 409) {
+            errorMsg = 'Email already in use. Please try logging in instead.';
+          } else if (httpError.statusCode == 400) {
+            errorMsg = result.error.message;
+          }
+        }
+
+        setState(() {
+          _errorMessage = errorMsg;
+        });
+
+        // Also show snackbar for immediate feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: result.error.message.toLowerCase().contains('already')
+                ? SnackBarAction(
+                    label: 'Sign In',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      AppRouter.replaceWith(context, AppRouter.customerLogin);
+                    },
+                  )
+                : null,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
+        final errorMsg = 'Registration failed: ${e.toString()}';
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = errorMsg;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -217,8 +278,9 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value)) {
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -279,7 +341,8 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        helperText: 'Min 8 characters with uppercase, lowercase, and number',
+                        helperText:
+                            'Min 8 characters with uppercase, lowercase, and number',
                         helperMaxLines: 2,
                       ),
                       validator: _validatePassword,
@@ -302,7 +365,8 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
@@ -391,9 +455,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text(
                               'Create Account',
@@ -417,7 +479,10 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                           onPressed: _isLoading
                               ? null
                               : () {
-                                  AppRouter.replaceWith(context, AppRouter.customerLogin);
+                                  AppRouter.replaceWith(
+                                    context,
+                                    AppRouter.customerLogin,
+                                  );
                                 },
                           child: const Text(
                             'Sign In',
@@ -426,9 +491,9 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Back to Staff Login Link
                     OutlinedButton.icon(
                       onPressed: _isLoading

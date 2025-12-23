@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../navigation/app_router.dart';
+import '../../../services/auth/customer_auth_service.dart';
+import '../../../services/service_locator.dart';
+import '../../../models/customer_auth.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -10,34 +13,40 @@ class CustomerProfileScreen extends StatefulWidget {
 
 class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   bool _isLoading = true;
-  Map<String, dynamic>? _profile;
+  CustomerUser? _currentCustomer;
+  bool _hasInitialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadProfile();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      // Defer the load until after the current build phase completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadProfile();
+      });
+    }
   }
 
   Future<void> _loadProfile() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Load profile from API
-      await Future.delayed(const Duration(seconds: 1));
+      final authService = locator<CustomerAuthService>();
+      final customer = authService.currentCustomer;
+      
+      if (customer == null) {
+        // Not logged in, redirect to login
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/customer-login');
+        }
+        return;
+      }
 
       if (mounted) {
         setState(() {
-          _profile = {
-            'name': 'John Doe',
-            'email': 'john.doe@example.com',
-            'company': 'Acme Corporation',
-            'phone': '+1234567890',
-            'address': '123 Main St',
-            'city': 'Springfield',
-            'state': 'IL',
-            'country': 'USA',
-            'zipCode': '62701',
-          };
+          _currentCustomer = customer;
           _isLoading = false;
         });
       }
@@ -74,8 +83,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // TODO: Call logout API
-      Navigator.of(context).pushReplacementNamed('/customer-login');
+      final authService = locator<CustomerAuthService>();
+      await authService.logout();
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/customer-login');
+      }
     }
   }
 
@@ -97,7 +109,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _profile == null
+          : _currentCustomer == null
               ? const Center(child: Text('Failed to load profile'))
               : RefreshIndicator(
                   onRefresh: _loadProfile,
@@ -114,10 +126,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                 radius: 48,
                                 backgroundColor: colorScheme.primaryContainer,
                                 child: Text(
-                                  _profile!['name']
-                                      .toString()
+                                  _currentCustomer!.name
                                       .split(' ')
-                                      .map((n) => n[0])
+                                      .map((n) => n.isNotEmpty ? n[0] : '')
                                       .take(2)
                                       .join()
                                       .toUpperCase(),
@@ -130,14 +141,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                _profile!['name'],
+                                _currentCustomer!.name,
                                 style: theme.textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _profile!['email'],
+                                _currentCustomer!.email,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
@@ -156,63 +167,24 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             _InfoTile(
                               icon: Icons.business,
                               label: 'Company',
-                              value: _profile!['company'] ?? 'Not provided',
+                              value: _currentCustomer!.companyName ?? 'Not provided',
                             ),
                             const Divider(height: 1),
                             _InfoTile(
                               icon: Icons.phone,
                               label: 'Phone',
-                              value: _profile!['phone'] ?? 'Not provided',
+                              value: _currentCustomer!.phone ?? 'Not provided',
                             ),
                             const Divider(height: 1),
                             _InfoTile(
                               icon: Icons.email,
                               label: 'Email',
-                              value: _profile!['email'],
+                              value: _currentCustomer!.email,
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Address Information
-                      if (_profile!['address'] != null) ...[
-                        _SectionHeader(title: 'Address'),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      color: colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(_profile!['address'] ?? ''),
-                                          Text(
-                                            '${_profile!['city']}, ${_profile!['state']} ${_profile!['zipCode']}',
-                                          ),
-                                          Text(_profile!['country'] ?? ''),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
 
                       // Actions
                       _SectionHeader(title: 'Account'),

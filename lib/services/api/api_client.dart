@@ -90,7 +90,17 @@ class ApiClient {
     int retryCount = 0,
   }) async {
     try {
-      final uri = Uri.parse(url);
+      // Handle relative URLs by prepending baseUrl
+      String fullUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        final baseUrl = ApiConfig.baseUrl;
+        // Ensure no double slashes
+        final cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        final cleanRelativeUrl = url.startsWith('/') ? url : '/$url';
+        fullUrl = '$cleanBaseUrl$cleanRelativeUrl';
+      }
+
+      final uri = Uri.parse(fullUrl);
       final requestHeaders = await _buildHeaders(headers);
       final requestBody = _encodeBody(body);
 

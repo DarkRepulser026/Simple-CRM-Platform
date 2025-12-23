@@ -1,4 +1,47 @@
 import 'package:flutter/material.dart';
+import '../../services/service_locator.dart';
+import '../../services/api/api_client.dart';
+import '../../services/auth/auth_service.dart';
+
+// Models
+class DomainMapping {
+  final String id;
+  final String domain;
+  final String organizationId;
+  final String organizationName;
+  final bool isActive;
+  final bool autoAssign;
+  final int priority;
+
+  DomainMapping({
+    required this.id,
+    required this.domain,
+    required this.organizationId,
+    required this.organizationName,
+    required this.isActive,
+    required this.autoAssign,
+    required this.priority,
+  });
+
+  factory DomainMapping.fromJson(Map<String, dynamic> json) {
+    return DomainMapping(
+      id: json['id'] as String? ?? '',
+      domain: json['domain'] as String? ?? '',
+      organizationId: json['organizationId'] as String? ?? '',
+      organizationName: json['organizationName'] as String? ?? '',
+      isActive: json['isActive'] as bool? ?? true,
+      autoAssign: json['autoAssign'] as bool? ?? false,
+      priority: json['priority'] as int? ?? 0,
+    );
+  }
+}
+
+class Organization {
+  final String id;
+  final String name;
+
+  Organization({required this.id, required this.name});
+}
 
 /// Screen for managing organization domain auto-assignment rules
 class DomainMappingScreen extends StatefulWidget {
@@ -12,6 +55,8 @@ class _DomainMappingScreenState extends State<DomainMappingScreen> {
   bool _isLoading = true;
   List<DomainMapping> _mappings = [];
   List<Organization> _organizations = [];
+  final ApiClient _apiClient = locator<ApiClient>();
+  final AuthService _authService = locator<AuthService>();
 
   @override
   void initState() {
@@ -19,19 +64,71 @@ class _DomainMappingScreenState extends State<DomainMappingScreen> {
     _loadData();
   }
 
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = _authService.jwtToken;
+    final orgId = _authService.selectedOrganizationId;
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    if (orgId != null) headers['X-Organization-ID'] = orgId;
+    return headers;
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    // TODO: Load from API
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final headers = await _getAuthHeaders();
+      
+      // Load domain mappings
+      final mappingsResult = await _apiClient.get<Map<String, dynamic>>(
+        '/admin/domain-mappings',
+        headers: headers,
+        fromJson: (json) => json,
+      );
 
-    if (mounted) {
-      setState(() {
-        _mappings = []; // Replace with API data
-        _organizations = []; // Replace with API data
-        _isLoading = false;
-      });
+      if (!mounted) return;
+
+      if (mappingsResult.isSuccess) {
+        final mappingsData = (mappingsResult.value['mappings'] as List<dynamic>?)
+            ?.map((m) => DomainMapping.fromJson(m as Map<String, dynamic>))
+            .toList() ?? [];
+        
+        // TODO: Load organizations from API
+        // For now, extract unique organizations from mappings
+        final orgs = <String, Organization>{};
+        for (final mapping in mappingsData) {
+          if (!orgs.containsKey(mapping.organizationId)) {
+            orgs[mapping.organizationId] = Organization(
+              id: mapping.organizationId,
+              name: mapping.organizationName,
+            );
+          }
+        }
+
+        setState(() {
+          _mappings = mappingsData;
+          _organizations = orgs.values.toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+        _showError(mappingsResult.error.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('Failed to load data: $e');
+      }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   Future<void> _addDomainMapping() async {
@@ -84,9 +181,6 @@ class _DomainMappingScreenState extends State<DomainMappingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Domain Auto-Assignment Rules'),
@@ -449,30 +543,3 @@ class _AddDomainDialogState extends State<_AddDomainDialog> {
   }
 }
 
-// Models
-class DomainMapping {
-  final String id;
-  final String domain;
-  final String organizationId;
-  final String organizationName;
-  final bool isActive;
-  final bool autoAssign;
-  final int priority;
-
-  DomainMapping({
-    required this.id,
-    required this.domain,
-    required this.organizationId,
-    required this.organizationName,
-    required this.isActive,
-    required this.autoAssign,
-    required this.priority,
-  });
-}
-
-class Organization {
-  final String id;
-  final String name;
-
-  Organization({required this.id, required this.name});
-}

@@ -1,8 +1,10 @@
 import 'package:get_it/get_it.dart';
 import 'auth/auth_service.dart';
 import 'auth/auth_service_impl.dart';
+import 'auth/customer_auth_service.dart';
 import 'api/api_client.dart';
 import 'storage/secure_storage.dart';
+import 'customer_api_service.dart';
 import 'contacts_service.dart';
 import 'tasks_service.dart';
 import 'leads_service.dart';
@@ -32,6 +34,21 @@ Future<void> setupLocator() async {
     locator<SecureStorage>(),
     locator<ApiClient>(),
   ));
+
+  // Customer API service
+  locator.registerLazySingleton<CustomerApiService>(() => CustomerApiService(
+    storage: locator<SecureStorage>(),
+  ));
+
+  // Customer Auth service
+  locator.registerLazySingleton<CustomerAuthService>(() => CustomerAuthService(
+    apiService: locator<CustomerApiService>(),
+    storage: locator<SecureStorage>(),
+  ));
+
+  // Initialize customer auth service to restore session
+  final customerAuth = locator<CustomerAuthService>();
+  await customerAuth.init();
 
   // Domain services (require ApiClient + AuthService)
   locator.registerLazySingleton<ContactsService>(() => ContactsService(

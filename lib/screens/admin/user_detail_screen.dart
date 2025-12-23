@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/users_service.dart';
+import '../../services/roles_service.dart';
 import '../../models/user.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
@@ -60,6 +61,7 @@ class UserDetailCard extends StatefulWidget {
 class _UserDetailCardState extends State<UserDetailCard> {
   late final UsersService _usersService;
   late final AuthService _authService;
+  late final RolesService _rolesService;
   bool _isLoading = true;
   String? _error;
   User? _user;
@@ -70,13 +72,14 @@ class _UserDetailCardState extends State<UserDetailCard> {
   late TextEditingController _emailCtrl;
   bool _isActive = true;
   String? _role;
-  final List<String> _availableRoles = const ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+  List<String> _availableRoles = [];
 
   @override
   void initState() {
     super.initState();
     _usersService = locator<UsersService>();
     _authService = locator<AuthService>();
+    _rolesService = locator<RolesService>();
     _nameCtrl = TextEditingController();
     _emailCtrl = TextEditingController();
     _load();
@@ -95,10 +98,24 @@ class _UserDetailCardState extends State<UserDetailCard> {
       _error = null;
     });
     try {
+      // Fetch roles
+      final rolesRes = await _rolesService.getRoles();
+      if (rolesRes.isSuccess) {
+        _availableRoles = rolesRes.value.roles.map((r) => r.name).toList();
+      } else {
+        _availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+      }
+
       final res = await _usersService.getUser(widget.userId);
       if (res.isSuccess) {
         if (!mounted) return;
         final user = res.value;
+
+        // Ensure current role is in available roles
+        if (user.role != null && !_availableRoles.contains(user.role)) {
+          _availableRoles.add(user.role!);
+        }
+
         setState(() {
           _user = user;
           _nameCtrl.text = user.name;

@@ -90,9 +90,12 @@ export async function registerCustomer({ email, password, name, companyName, pho
     throw new Error('Email, password, and name are required');
   }
 
+  // Normalize email to lowercase
+  const normalizedEmail = email.toLowerCase().trim();
+
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
-    where: { email }
+    where: { email: normalizedEmail }
   });
 
   if (existingUser) {
@@ -105,7 +108,7 @@ export async function registerCustomer({ email, password, name, companyName, pho
   // Create user and customer profile in a transaction
   const user = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       name,
       passwordHash,
       type: 'CUSTOMER',
@@ -133,8 +136,10 @@ export async function registerCustomer({ email, password, name, companyName, pho
       id: user.id,
       email: user.email,
       name: user.name,
-      type: user.type,
-      customerProfile: user.customerProfile
+      companyName: user.customerProfile?.companyName || null,
+      phone: user.customerProfile?.phone || null,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString()
     }
   };
 }
@@ -150,9 +155,12 @@ export async function loginCustomer({ email, password }) {
     throw new Error('Email and password are required');
   }
 
+  // Normalize email to lowercase
+  const normalizedEmail = email.toLowerCase().trim();
+
   // Find user by email
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     include: {
       customerProfile: true
     }
@@ -193,8 +201,10 @@ export async function loginCustomer({ email, password }) {
       id: user.id,
       email: user.email,
       name: user.name,
-      type: user.type,
-      customerProfile: user.customerProfile
+      companyName: user.customerProfile?.companyName || null,
+      phone: user.customerProfile?.phone || null,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString()
     }
   };
 }
@@ -268,8 +278,10 @@ export async function verifyCustomerUser(userId) {
     id: user.id,
     email: user.email,
     name: user.name,
-    type: user.type,
-    customerProfile: user.customerProfile
+    companyName: user.customerProfile?.companyName || null,
+    phone: user.customerProfile?.phone || null,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString()
   };
 }
 

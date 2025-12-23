@@ -4,6 +4,7 @@ import '../../models/user.dart';
 import '../../models/pagination.dart';
 import '../../services/service_locator.dart';
 import '../../services/users_service.dart';
+import '../../services/roles_service.dart';
 import 'user_detail_screen.dart' as user_detail;
 import 'user_edit_screen.dart';
 import 'invite_user_screen.dart';
@@ -20,17 +21,34 @@ class UsersListScreen extends StatefulWidget {
 
 class _UsersListScreenState extends State<UsersListScreen> {
   late final UsersService _usersService;
+  late final RolesService _rolesService;
   int _reloadVersion = 0;
 
   String _search = '';
   String _roleFilter = 'All';
 
-  final List<String> _roleOptions = const ['All', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+  List<String> _roleOptions = ['All'];
 
   @override
   void initState() {
     super.initState();
     _usersService = locator<UsersService>();
+    _rolesService = locator<RolesService>();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    final res = await _rolesService.getRoles();
+    if (res.isSuccess) {
+      setState(() {
+        _roleOptions = ['All', ...res.value.roles.map((r) => r.name)];
+      });
+    } else {
+      // Fallback
+      setState(() {
+        _roleOptions = ['All', 'ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+      });
+    }
   }
 
   void _refreshList() {

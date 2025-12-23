@@ -6,12 +6,13 @@ import '../models/customer_auth.dart';
 import '../models/customer_ticket.dart';
 import '../models/customer_profile.dart';
 import '../utils/result.dart';
+import 'api/api_config.dart';
 import 'api/api_exceptions.dart';
 import 'storage/secure_storage.dart';
 
 /// Customer API Service for external/customer portal endpoints
 class CustomerApiService {
-  static const String _baseUrl = 'http://localhost:3001/api/external';
+  static String get _baseUrl => ApiConfig.external;
   static const Duration _timeout = Duration(seconds: 30);
   
   final SecureStorage _storage;
@@ -42,7 +43,7 @@ class CustomerApiService {
 
       if (response.statusCode == 201) {
         final authResponse = AuthResponse.fromJson(_decodeJson(response.body));
-        await _saveTokens(authResponse.token, authResponse.refreshToken);
+        await _saveTokens(authResponse.token, authResponse.refreshToken ?? '');
         return Result.success(authResponse);
       }
 
@@ -66,7 +67,7 @@ class CustomerApiService {
 
       if (response.statusCode == 200) {
         final authResponse = AuthResponse.fromJson(_decodeJson(response.body));
-        await _saveTokens(authResponse.token, authResponse.refreshToken);
+        await _saveTokens(authResponse.token, authResponse.refreshToken ?? '');
         return Result.success(authResponse);
       }
 
@@ -99,7 +100,7 @@ class CustomerApiService {
   Future<Result<String, ApiError>> refreshAccessToken() async {
     try {
       if (_refreshToken == null) {
-        _refreshToken = await _storage.readToken(); // Try loading from storage
+        _refreshToken = await _storage.readRefreshToken(); // Try loading from storage
       }
 
       if (_refreshToken == null) {
@@ -426,7 +427,13 @@ class CustomerApiService {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     await _storage.saveToken(accessToken);
-    // Store refresh token separately if needed
+    await _storage.saveRefreshToken(refreshToken);
+  }
+
+  /// Load tokens from storage
+  Future<void> loadTokensFromStorage() async {
+    _accessToken = await _storage.readToken();
+    _refreshToken = await _storage.readRefreshToken();
   }
 
   /// Clear tokens from memory and storage
@@ -434,6 +441,7 @@ class CustomerApiService {
     _accessToken = null;
     _refreshToken = null;
     await _storage.clearToken();
+    await _storage.clearRefreshToken();
   }
 
   /// Encode JSON

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../services/service_locator.dart';
+import '../../services/api/api_client.dart';
+import '../../services/auth/auth_service.dart';
 
 /// Screen for managing customer-organization assignments
 class CustomerOrganizationScreen extends StatefulWidget {
@@ -17,6 +20,8 @@ class _CustomerOrganizationScreenState
   List<Map<String, dynamic>> _unassignedCustomers = [];
   List<Map<String, dynamic>> _assignedCustomers = [];
   Map<String, dynamic>? _stats;
+  final ApiClient _apiClient = locator<ApiClient>();
+  final AuthService _authService = locator<AuthService>();
 
   @override
   void initState() {
@@ -31,44 +36,124 @@ class _CustomerOrganizationScreenState
     super.dispose();
   }
 
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = _authService.jwtToken;
+    final orgId = _authService.selectedOrganizationId;
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    if (orgId != null) headers['X-Organization-ID'] = orgId;
+    return headers;
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    // TODO: Load data from API
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final headers = await _getAuthHeaders();
+      
+      // Load unassigned customers
+      final unassignedResult = await _apiClient.get<Map<String, dynamic>>(
+        '/admin/customers/unassigned',
+        headers: headers,
+        fromJson: (json) => json,
+      );
 
-    if (mounted) {
-      setState(() {
-        _unassignedCustomers = []; // Replace with API data
-        _assignedCustomers = []; // Replace with API data
-        _stats = {
-          'total': 0,
-          'assigned': 0,
-          'unassigned': 0,
-          'assignmentRate': '0',
-        };
-        _isLoading = false;
-      });
+      // Load assigned customers
+      final assignedResult = await _apiClient.get<Map<String, dynamic>>(
+        '/admin/customers/assigned',
+        headers: headers,
+        fromJson: (json) => json,
+      );
+
+      // Load statistics
+      final statsResult = await _apiClient.get<Map<String, dynamic>>(
+        '/admin/customers/stats',
+        headers: headers,
+        fromJson: (json) => json,
+      );
+
+      if (!mounted) return;
+
+      if (unassignedResult.isSuccess &&
+          assignedResult.isSuccess &&
+          statsResult.isSuccess) {
+        final unassigned = (unassignedResult.value['customers'] as List<dynamic>?)
+            ?.map((c) => c as Map<String, dynamic>)
+            .toList() ?? [];
+        final assigned = (assignedResult.value['customers'] as List<dynamic>?)
+            ?.map((c) => c as Map<String, dynamic>)
+            .toList() ?? [];
+        final stats = statsResult.value['stats'] as Map<String, dynamic>?;
+
+        setState(() {
+          _unassignedCustomers = unassigned;
+          _assignedCustomers = assigned;
+          _stats = stats ?? {
+            'total': 0,
+            'assigned': 0,
+            'unassigned': 0,
+            'assignmentRate': 0,
+          };
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+        _showError('Failed to load data');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('Failed to load data: $e');
+      }
     }
   }
 
   Future<void> _assignCustomer(String userId, String orgId) async {
-    // TODO: Call API to assign customer
-    await Future.delayed(const Duration(milliseconds: 500));
-    _loadData();
+    try {
+      final headers = await _getAuthHeaders();
+      await _apiClient.post(
+        '/admin/customers/$userId/assign-organization',
+        headers: headers,
+        body: {'organizationId': orgId},
+      );
+      if (mounted) {
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to assign customer: $e');
+      }
+    }
   }
 
   Future<void> _unassignCustomer(String userId) async {
-    // TODO: Call API to unassign customer
-    await Future.delayed(const Duration(milliseconds: 500));
-    _loadData();
+    try {
+      final headers = await _getAuthHeaders();
+      await _apiClient.post(
+        '/admin/customers/$userId/unassign-organization',
+        headers: headers,
+      );
+      if (mounted) {
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to unassign customer: $e');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customer Organization Management'),
@@ -195,13 +280,20 @@ class _CustomerOrganizationScreenState
   }
 
   Future<void> _showAssignDialog(Map<String, dynamic> customer) async {
-    // TODO: Show dialog to select organization
-    // For now, just a placeholder
-    showDialog(
+    final TextEditingController orgIdController = TextEditingController();
+    
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Assign to Organization'),
-        content: Text('Assign ${customer['name']} to an organization'),
+        content: TextField(
+          controller: orgIdController,
+          decoration: const InputDecoration(
+            labelText: 'Organization ID',
+            hintText: 'Enter organization ID',
+            border: OutlineInputBorder(),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -209,14 +301,19 @@ class _CustomerOrganizationScreenState
           ),
           FilledButton(
             onPressed: () {
-              Navigator.pop(context);
-              // _assignCustomer(customer['userId'], selectedOrgId);
+              if (orgIdController.text.isNotEmpty) {
+                Navigator.pop(context, orgIdController.text);
+              }
             },
             child: const Text('Assign'),
           ),
         ],
       ),
     );
+
+    if (result != null && result.isNotEmpty) {
+      await _assignCustomer(customer['userId'], result);
+    }
   }
 
   Future<void> _showUnassignDialog(Map<String, dynamic> customer) async {

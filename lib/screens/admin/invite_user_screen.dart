@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/service_locator.dart';
 import '../../services/users_service.dart';
+import '../../services/roles_service.dart';
 import '../../services/auth/auth_service.dart';
 
 class InviteUserScreen extends StatefulWidget {
@@ -16,6 +17,26 @@ class _InviteUserScreenState extends State<InviteUserScreen> {
   String _role = 'ADMIN';
   bool _isLoading = false;
   String? _error;
+  List<String> _availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    final rolesService = locator<RolesService>();
+    final res = await rolesService.getRoles();
+    if (res.isSuccess) {
+      setState(() {
+        _availableRoles = res.value.roles.map((r) => r.name).toList();
+        if (_availableRoles.isNotEmpty && !_availableRoles.contains(_role)) {
+          _role = _availableRoles.first;
+        }
+      });
+    }
+  }
 
   Future<void> _invite() async {
     if (!_formKey.currentState!.validate()) return;
@@ -237,24 +258,14 @@ class _InviteUserScreenState extends State<InviteUserScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'Role',
                                 ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'ADMIN',
-                                    child: Text('Admin'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'MANAGER',
-                                    child: Text('Manager'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'AGENT',
-                                    child: Text('Agent'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'VIEWER',
-                                    child: Text('Viewer'),
-                                  ),
-                                ],
+                                items: _availableRoles
+                                    .map(
+                                      (r) => DropdownMenuItem(
+                                        value: r,
+                                        child: Text(r),
+                                      ),
+                                    )
+                                    .toList(),
                                 onChanged: (v) {
                                   if (v != null) {
                                     setState(() => _role = v);

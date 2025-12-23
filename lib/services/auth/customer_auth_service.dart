@@ -28,7 +28,11 @@ class CustomerAuthService {
   /// Initialize auth state from storage
   Future<void> init() async {
     final token = await _storage.readToken();
-    if (token != null) {
+    
+    if (token != null && token.isNotEmpty) {
+      // Load tokens into API service
+      await _apiService.loadTokensFromStorage();
+      
       // Verify token is still valid
       final result = await _apiService.verifyToken();
       if (result.isSuccess && result.value.isValid) {

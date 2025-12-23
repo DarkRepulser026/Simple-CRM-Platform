@@ -3,6 +3,7 @@ import '../../models/user.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/users_service.dart';
+import '../../services/roles_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
@@ -16,6 +17,7 @@ class UserEditScreen extends StatefulWidget {
 
 class _UserEditScreenState extends State<UserEditScreen> {
   late final UsersService _usersService;
+  late final RolesService _rolesService;
   bool _isLoading = true;
   String? _error;
 
@@ -26,12 +28,13 @@ class _UserEditScreenState extends State<UserEditScreen> {
   bool _isActive = true;
   bool _canEditRole = false;
   String? _role;
-  final List<String> _availableRoles = const ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+  List<String> _availableRoles = [];
 
   @override
   void initState() {
     super.initState();
     _usersService = locator<UsersService>();
+    _rolesService = locator<RolesService>();
     _load();
   }
 
@@ -44,6 +47,15 @@ class _UserEditScreenState extends State<UserEditScreen> {
 
   Future<void> _load() async {
     try {
+      // Fetch roles first
+      final rolesRes = await _rolesService.getRoles();
+      if (rolesRes.isSuccess) {
+        _availableRoles = rolesRes.value.roles.map((r) => r.name).toList();
+      } else {
+        // Fallback if roles fetch fails, but we should probably handle this better
+        _availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+      }
+
       final res = await _usersService.getUser(widget.userId);
       if (res.isSuccess) {
         final u = res.value;
@@ -51,6 +63,11 @@ class _UserEditScreenState extends State<UserEditScreen> {
         _emailCtrl.text = u.email;
         _role = u.role;
         _isActive = u.isActive;
+
+        // Ensure current role is in available roles if it's not there for some reason
+        if (_role != null && !_availableRoles.contains(_role)) {
+          _availableRoles.add(_role!);
+        }
 
         final myRole =
             locator<AuthService>().selectedOrganization?.role?.toUpperCase();

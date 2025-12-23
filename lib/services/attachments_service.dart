@@ -47,7 +47,7 @@ class AttachmentsService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         if (json['url'] != null && (json['url'] as String).startsWith('/')) {
-          json['url'] = ApiConfig.baseUrl + json['url'];
+          json['url'] = ApiConfig.serverUrl + json['url'];
         }
         return Result.success(Attachment.fromJson(json));
       }
@@ -76,7 +76,7 @@ class AttachmentsService {
         final json = jsonDecode(response.body) as List<dynamic>;
         final attachments = json.map((e) {
           final m = Map<String, dynamic>.from(e as Map<String, dynamic>);
-          if (m['url'] != null && (m['url'] as String).startsWith('/')) m['url'] = ApiConfig.baseUrl + m['url'];
+          if (m['url'] != null && (m['url'] as String).startsWith('/')) m['url'] = ApiConfig.serverUrl + m['url'];
           return Attachment.fromJson(m);
         }).toList();
         return Result.success(attachments);

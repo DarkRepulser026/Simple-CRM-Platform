@@ -42,21 +42,21 @@ class LoginRequest {
 class AuthResponse {
   final String userId;
   final String token;
-  final String refreshToken;
+  final String? refreshToken;
   final CustomerUser user;
 
   const AuthResponse({
     required this.userId,
     required this.token,
-    required this.refreshToken,
+    this.refreshToken,
     required this.user,
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
     return AuthResponse(
-      userId: json['userId'] as String,
+      userId: json['userId'] as String? ?? json['user']['id'] as String,
       token: json['token'] as String,
-      refreshToken: json['refreshToken'] as String,
+      refreshToken: json['refreshToken'] as String?,
       user: CustomerUser.fromJson(json['user'] as Map<String, dynamic>),
     );
   }

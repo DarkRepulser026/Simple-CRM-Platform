@@ -610,6 +610,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   AppRouter.navigateTo(context, AppRouter.activityLogs),
             ),
             _SidebarSubItem(
+              label: 'Customers',
+              onTap: () =>
+                  AppRouter.navigateTo(context, AppRouter.adminCustomers),
+            ),
+            _SidebarSubItem(
               label: 'Customer Orgs',
               onTap: () =>
                   AppRouter.navigateTo(context, AppRouter.adminCustomerOrgs),
@@ -677,6 +682,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool sendInvite = true;
     final formKey = GlobalKey<FormState>();
 
+    // Fetch roles
+    List<String> availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+    final rolesRes = await _rolesService.getRoles();
+    if (rolesRes.isSuccess) {
+      availableRoles = rolesRes.value.roles.map((r) => r.name).toList();
+    }
+
+    // Ensure current role is in available roles
+    if (user?.role != null && !availableRoles.contains(user!.role)) {
+      availableRoles.add(user.role!);
+    }
+    // Ensure initial role is in available roles
+    if (!availableRoles.contains(role)) {
+      availableRoles.add(role);
+    }
+
+    if (!ctx.mounted) return;
+
     await showDialog<void>(
       context: ctx,
       builder: (dialogCtx) {
@@ -707,7 +730,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       DropdownButtonFormField<String>(
                         value: role,
                         decoration: const InputDecoration(labelText: 'Role'),
-                        items: ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER']
+                        items: availableRoles
                             .map(
                               (r) => DropdownMenuItem(value: r, child: Text(r)),
                             )

@@ -389,7 +389,7 @@ class AuthServiceImpl implements AuthService {
     try {
       // Debug endpoint for development/testing
       final response = await _apiClient.post<Map<String, dynamic>>(
-        '${ApiConfig.baseUrl}/auth/debug-login',
+        ApiConfig.debugLogin,
         body: {
           'email': email,
           'password': password,

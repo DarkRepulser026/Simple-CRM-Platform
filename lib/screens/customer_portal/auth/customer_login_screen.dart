@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../navigation/app_router.dart';
+import '../../../services/auth/customer_auth_service.dart';
+import '../../../services/service_locator.dart';
+import '../../../models/customer_auth.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -35,20 +38,29 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     });
 
     try {
-      // TODO: Call customer auth service
-      // await customerAuthService.login(
-      //   email: _emailController.text.trim(),
-      //   password: _passwordController.text,
-      // );
+      final authService = locator<CustomerAuthService>();
+      
+      final request = LoginRequest(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-      // On success, navigate to customer portal
-      if (mounted) {
+      final result = await authService.login(request);
+
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        // Navigate to customer portal
         AppRouter.replaceWith(context, AppRouter.customerPortal);
+      } else {
+        setState(() {
+          _errorMessage = result.error.message;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = 'Login failed: ${e.toString()}';
         });
       }
     } finally {

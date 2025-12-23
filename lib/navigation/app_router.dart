@@ -23,6 +23,7 @@ import '../screens/admin/invite_user_screen.dart';
 import '../screens/admin/invitations_screen.dart';
 import '../screens/admin/roles_list_screen.dart';
 import '../screens/admin/activity_logs_screen.dart';
+import '../screens/admin/admin_customers_screen.dart';
 import '../screens/admin/customer_organization_screen.dart';
 import '../screens/admin/domain_mapping_screen.dart';
 // unused: '../screens/access_denied_screen.dart';
@@ -214,6 +215,7 @@ class AppRouter {
     static const String adminInvitations = '/admin/invitations';
   static const String adminRoles = '/admin/roles';
   static const String activityLogs = '/admin/activity-logs';
+  static const String adminCustomers = '/admin/customers';
   static const String adminCustomerOrgs = '/admin/customer-organizations';
   static const String adminDomainMappings = '/admin/domain-mappings';
   static const String interactions = '/interactions';
@@ -287,6 +289,7 @@ class AppRouter {
       adminRoles: (context) => adminGuarded((c) => const RolesListScreen())(context),
       adminInvitations: (context) => managerOrAdminGuarded((c) => const InvitationsScreen())(context),
       activityLogs: (context) => adminGuarded((c) => const ActivityLogsScreen())(context),
+      adminCustomers: (context) => managerOrAdminGuarded((c) => const AdminCustomersScreen())(context),
       adminCustomerOrgs: (context) => managerOrAdminGuarded((c) => const CustomerOrganizationScreen())(context),
       adminDomainMappings: (context) => managerOrAdminGuarded((c) => const DomainMappingScreen())(context),
       interactions: (context) => const InteractionsListScreen(),
