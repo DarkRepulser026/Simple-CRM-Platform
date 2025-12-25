@@ -57,6 +57,16 @@ class _LeadEditScreenState extends State<LeadEditScreen> {
     final res = await _leadsService.getLead(widget.leadId);
     if (res.isSuccess) {
       _lead = res.value;
+      
+      // 🔒 UX Rule: After conversion → read-only (prevent editing)
+      if (_lead!.isConverted) {
+        setState(() {
+          _error = 'Cannot edit converted lead. This lead is now read-only.';
+          _isLoading = false;
+        });
+        return;
+      }
+      
       _firstNameCtrl.text = _lead!.firstName;
       _lastNameCtrl.text = _lead!.lastName;
       _titleCtrl.text = _lead!.title ?? '';

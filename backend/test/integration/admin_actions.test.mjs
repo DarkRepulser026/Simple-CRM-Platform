@@ -2,7 +2,7 @@ import { spawnServer, waitForHealth, stopServer, createAdminUserAndOrg, createOr
 import fetch from 'node-fetch';
 import { expect } from 'chai';
 
-const BASE_URL = `http://localhost:${process.env.PORT || 3001}`;
+const BASE_URL = `http://localhost:${process.env.PORT || 3001}/api`;
 let adminToken;
 let adminUserId;
 let orgId;
@@ -19,14 +19,14 @@ describe('Admin actions - Integration tests', function() {
     orgId = org.id;
   });
   after(async () => {
-    try { if (orgId) await fetch(`${BASE_URL}/organizations/${orgId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } }); } catch (e) {}
+    try { if (orgId) await fetch(`${BASE_URL}/admin/organizations/${orgId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } }); } catch (e) {}
     await stopServer();
   });
 
   it('should impersonate a user (POST /admin/view-as/:userId)', async () => {
     // Create a new user using admin's privileges
     const email = `impuser+${Date.now()}@example.com`;
-    const createUserRes = await fetch(`${BASE_URL}/users`, {
+    const createUserRes = await fetch(`${BASE_URL}/admin/users`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId },
       body: JSON.stringify({ email, name: 'Impersonation Test', role: 'AGENT' })
     });
@@ -42,7 +42,7 @@ describe('Admin actions - Integration tests', function() {
     expect(json.token).to.exist;
 
     // Call auth/me with impersonation token to confirm it represents the target user
-    const meResp = await fetch(`${BASE_URL}/auth/me`, { headers: { 'Authorization': `Bearer ${json.token}` } });
+    const meResp = await fetch(`${BASE_URL}/auth/staff/me`, { headers: { 'Authorization': `Bearer ${json.token}` } });
     expect(meResp.ok).to.be.true;
     const meJson = await meResp.json();
     expect(meJson.user.id).to.equal(created.id);

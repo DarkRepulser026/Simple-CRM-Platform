@@ -7,6 +7,7 @@ import 'contact_edit_screen.dart' show showContactEditDialog;
 import '../../services/contacts_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/activity_log_widget.dart';
 
 class ContactDetailArgs {
   const ContactDetailArgs({required this.contactId});
@@ -124,34 +125,73 @@ class _ContactDetailDialogState extends State<_ContactDetailDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 200,
-                    child: Center(
-                      child: LoadingView(message: 'Loading contact...'),
+        child: _isLoading
+            ? const SizedBox(
+                height: 200,
+                child: Center(
+                  child: LoadingView(message: 'Loading contact...'),
+                ),
+              )
+            : _error != null
+                ? Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ErrorView(message: _error!, onRetry: _load),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Close'),
+                          ),
+                        ),
+                      ],
                     ),
                   )
-                : _error != null
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ErrorView(message: _error!, onRetry: _load),
-                          const SizedBox(height: 16),
-                          Align(
+                : DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const TabBar(
+                          tabs: [
+                            Tab(text: 'Details'),
+                            Tab(text: 'Activity Log'),
+                          ],
+                        ),
+                        SizedBox(
+                          height: 500,
+                          child: TabBarView(
+                            children: [
+                              SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: _buildContent(context, colorScheme),
+                              ),
+                              SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: ActivityLogWidget(
+                                  entityId: widget.contactId,
+                                  entityType: 'Contact',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                          child: Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () => Navigator.of(context).pop(false),
                               child: const Text('Close'),
                             ),
                           ),
-                        ],
-                      )
-                    : _buildContent(context, colorScheme),
-          ),
-        ),
+                        ),
+                      ],
+                    ),
+                  ),
       ),
     );
   }

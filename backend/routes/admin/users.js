@@ -56,12 +56,77 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /assignable - Get users that can be assigned (filtered by role)
+router.get('/assignable', async (req, res) => {
+  try {
+    const { type } = req.query; // 'ticket' or 'task'
+    
+    // Tickets: Only Agents can be assigned
+    // Tasks: Managers and Agents can be assigned (NOT Admins)
+    const roleFilter = type === 'ticket' 
+      ? ['AGENT']
+      : ['MANAGER', 'AGENT'];
+    
+    const userOrgs = await prisma.userOrganization.findMany({
+      where: {
+        organizationId: req.organizationId,
+        role: { in: roleFilter },
+        user: { isActive: true }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            profileImage: true
+          }
+        }
+      },
+      orderBy: {
+        user: { name: 'asc' }
+      }
+    });
+    
+    const users = userOrgs.map(uo => ({
+      ...uo.user,
+      role: uo.role
+    }));
+    
+    res.json({ users });
+  } catch (error) {
+    console.error('Get assignable users error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // POST / - Create user
 router.post('/', authorize(['MANAGE_USERS']), async (req, res) => {
   try {
     const { email, name, role, isActive } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
     
+    // Resolve role first
+    let roleEnum = 'VIEWER';
+    let userRoleId = null;
+    
+    if (role) {
+       const userRole = await prisma.userRole.findFirst({
+        where: { organizationId: req.organizationId, name: role }
+      });
+      if (userRole) {
+        roleEnum = userRole.roleType;
+        userRoleId = userRole.id;
+      } else {
+        const validRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+        if (validRoles.includes(role)) {
+          roleEnum = role;
+        } else {
+           return res.status(400).json({ message: `Invalid role: ${role}` });
+        }
+      }
+    }
+
     let user = await prisma.user.findUnique({ where: { email } });
     if (user) return res.status(409).json({ message: 'User already exists' });
     
@@ -70,7 +135,7 @@ router.post('/', authorize(['MANAGE_USERS']), async (req, res) => {
     });
     
     await prisma.userOrganization.create({ 
-      data: { userId: user.id, organizationId: req.organizationId, role: role || 'VIEWER' } 
+      data: { userId: user.id, organizationId: req.organizationId, role: roleEnum, userRoleId } 
     });
     
     await createActivityLogEntry({ 
@@ -140,21 +205,50 @@ router.put('/:id', async (req, res) => {
     delete data.permissions;
     
     if (data.role && data.role !== currentRole) {
-      const role = data.role;
+      const roleName = data.role;
       delete data.role;
+
+      // Try to find the role by name in the organization
+      const userRole = await prisma.userRole.findFirst({
+        where: {
+          organizationId: req.organizationId,
+          name: roleName
+        }
+      });
+
+      let updateData = {};
+
+      if (userRole) {
+        updateData = {
+          role: userRole.roleType,
+          userRoleId: userRole.id
+        };
+      } else {
+        // Fallback for legacy enum values
+        const validRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
+        if (validRoles.includes(roleName)) {
+           updateData = {
+             role: roleName,
+             userRoleId: null
+           };
+        } else {
+           return res.status(400).json({ message: `Invalid role: ${roleName}` });
+        }
+      }
+
       await prisma.userOrganization.updateMany({ 
         where: { userId: targetUserId, organizationId: req.organizationId }, 
-        data: { role } 
+        data: updateData 
       });
       await prisma.user.update({ where: { id: targetUserId }, data: { tokenVersion: { increment: 1 } } });
       await createActivityLogEntry({ 
         action: 'USER_ROLE_UPDATED', 
         entityType: 'UserOrganization', 
         entityId: targetUserId, 
-        description: `${req.user.email} changed role for user ${targetUserId} to ${role}`, 
+        description: `${req.user.email} changed role for user ${targetUserId} to ${roleName}`, 
         userId: req.user.id, 
         organizationId: req.organizationId, 
-        metadata: { oldValues: { role: currentRole }, newValues: { role } } 
+        metadata: { oldValues: { role: currentRole }, newValues: { role: roleName } } 
       });
     } else {
       delete data.role;

@@ -71,6 +71,7 @@ class TicketsService {
     String? status,
     String? priority,
     String? ownerId,
+    String? accountId,
     String? search,
   }) async {
     // Check authentication
@@ -91,6 +92,9 @@ class TicketsService {
     }
     if (ownerId != null && ownerId.isNotEmpty) {
       queryParams['ownerId'] = ownerId;
+    }
+    if (accountId != null && accountId.isNotEmpty) {
+      queryParams['accountId'] = accountId;
     }
     if (search != null && search.isNotEmpty) {
       queryParams['search'] = search;
@@ -182,10 +186,10 @@ class TicketsService {
 
     final url = '${ApiConfig.tickets}/$ticketId/assign';
 
-    return _apiClient.post<Ticket>(
+    return _apiClient.put<Ticket>(
       url,
       headers: await _getAuthHeaders(),
-      body: {'assignedToId': agentId},
+      body: {'ownerId': agentId},
       fromJson: Ticket.fromJson,
     );
   }

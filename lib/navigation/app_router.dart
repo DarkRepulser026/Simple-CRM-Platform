@@ -23,8 +23,6 @@ import '../screens/admin/invite_user_screen.dart';
 import '../screens/admin/invitations_screen.dart';
 import '../screens/admin/roles_list_screen.dart';
 import '../screens/admin/activity_logs_screen.dart';
-import '../screens/admin/admin_customers_screen.dart';
-import '../screens/admin/customer_organization_screen.dart';
 import '../screens/admin/domain_mapping_screen.dart';
 // unused: '../screens/access_denied_screen.dart';
 import '../screens/access_denied_redirect_screen.dart';
@@ -40,21 +38,13 @@ import '../screens/tickets/tickets_list_screen.dart';
 import '../screens/tickets/ticket_create_screen.dart';
 import '../screens/tickets/ticket_detail_screen.dart';
 import '../screens/tickets/ticket_edit_screen.dart';
-import '../screens/customer_portal/auth/customer_login_screen.dart';
-import '../screens/customer_portal/auth/customer_register_screen.dart';
-import '../screens/customer_portal/customer_portal_screen.dart';
-import '../screens/customer_portal/tickets/customer_tickets_list_screen.dart';
-import '../screens/customer_portal/tickets/customer_ticket_detail_screen.dart';
-import '../screens/customer_portal/tickets/create_ticket_screen.dart';
-import '../screens/customer_portal/profile/customer_profile_screen.dart';
-import '../screens/customer_portal/profile/customer_edit_profile_screen.dart';
-import '../screens/customer_portal/profile/customer_change_password_screen.dart';
+import '../widgets/app_shell.dart';
 
 /// ===== CUSTOM PAGE TRANSITIONS =====
 /// Smooth fade transition for better UX
 class FadeRoute<T> extends PageRoute<T> {
   FadeRoute({required this.builder, RouteSettings? settings})
-      : super(settings: settings);
+    : super(settings: settings);
 
   final WidgetBuilder builder;
 
@@ -65,8 +55,11 @@ class FadeRoute<T> extends PageRoute<T> {
   String? get barrierLabel => null;
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation) {
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
     return builder(context);
   }
 
@@ -77,8 +70,12 @@ class FadeRoute<T> extends PageRoute<T> {
   Duration get transitionDuration => const Duration(milliseconds: 300);
 
   @override
-  Widget buildTransitions(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation, Widget child) {
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
     return FadeTransition(opacity: animation, child: child);
   }
 }
@@ -86,7 +83,7 @@ class FadeRoute<T> extends PageRoute<T> {
 /// Slide transition for detail screens
 class SlideRoute<T> extends PageRoute<T> {
   SlideRoute({required this.builder, RouteSettings? settings})
-      : super(settings: settings);
+    : super(settings: settings);
 
   final WidgetBuilder builder;
 
@@ -97,8 +94,11 @@ class SlideRoute<T> extends PageRoute<T> {
   String? get barrierLabel => null;
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation) {
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
     return builder(context);
   }
 
@@ -109,8 +109,12 @@ class SlideRoute<T> extends PageRoute<T> {
   Duration get transitionDuration => const Duration(milliseconds: 250);
 
   @override
-  Widget buildTransitions(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation, Widget child) {
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
     const begin = Offset(1.0, 0.0);
     const end = Offset.zero;
     const curve = Curves.easeOutCubic;
@@ -144,6 +148,12 @@ class TaskEditArgs {
   final String taskId;
 }
 
+class TicketCreateArgs {
+  const TicketCreateArgs({this.accountId});
+
+  final String? accountId;
+}
+
 class TicketDetailArgs {
   const TicketDetailArgs({required this.ticketId});
 
@@ -151,7 +161,12 @@ class TicketDetailArgs {
 }
 
 class ActivityLogsArgs {
-  const ActivityLogsArgs({this.entityType, this.entityId, this.userId, this.search});
+  const ActivityLogsArgs({
+    this.entityType,
+    this.entityId,
+    this.userId,
+    this.search,
+  });
   final String? entityType;
   final String? entityId;
   final String? userId;
@@ -176,11 +191,6 @@ class LeadEditArgs {
 class ContactEditArgs {
   const ContactEditArgs({required this.contactId});
   final String contactId;
-}
-
-class CustomerTicketDetailArgs {
-  const CustomerTicketDetailArgs({required this.ticketId});
-  final int ticketId;
 }
 
 /// Central route registry with typed navigation
@@ -211,29 +221,16 @@ class AppRouter {
   static const String adminUsers = '/admin/users';
   static const String adminUserDetail = '/admin/users/detail';
   static const String adminUserEdit = '/admin/users/edit';
-    static const String adminInvite = '/admin/invite';
-    static const String adminInvitations = '/admin/invitations';
+  static const String adminInvite = '/admin/invite';
+  static const String adminInvitations = '/admin/invitations';
   static const String adminRoles = '/admin/roles';
   static const String activityLogs = '/admin/activity-logs';
-  static const String adminCustomers = '/admin/customers';
-  static const String adminCustomerOrgs = '/admin/customer-organizations';
   static const String adminDomainMappings = '/admin/domain-mappings';
   static const String interactions = '/interactions';
   static const String tasks = '/tasks';
   static const String taskCreate = '/task-create';
   static const String taskDetail = '/task-detail';
   static const String taskEdit = '/task-edit';
-  
-  // Customer Portal routes
-  static const String customerLogin = '/customer-login';
-  static const String customerRegister = '/customer-register';
-  static const String customerPortal = '/customer-portal';
-  static const String customerTickets = '/customer-tickets';
-  static const String customerTicketDetail = '/customer-ticket-detail';
-  static const String customerTicketCreate = '/customer-ticket-create';
-  static const String customerProfile = '/customer-profile';
-  static const String customerEditProfile = '/customer-edit-profile';
-  static const String customerChangePassword = '/customer-change-password';
 
   /// Navigate to a route with optional arguments
   static Future<T?> navigateTo<T>(
@@ -241,7 +238,9 @@ class AppRouter {
     String route, {
     Object? arguments,
   }) {
-    return Navigator.of(context).pushNamed(route, arguments: arguments) as Future<T?>;
+    return Navigator.of(
+      context,
+    ).pushNamed(route, arguments: arguments).then((value) => value as T?);
   }
 
   /// Replace current route with smooth fade transition
@@ -250,10 +249,9 @@ class AppRouter {
     String route, {
     Object? arguments,
   }) {
-    return Navigator.of(context).pushReplacementNamed(
-      route,
-      arguments: arguments,
-    ).then((result) => result as T?);
+    return Navigator.of(context)
+        .pushReplacementNamed(route, arguments: arguments)
+        .then((result) => result as T?);
   }
 
   /// Pop current route
@@ -266,44 +264,54 @@ class AppRouter {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  /// Wrap a screen with AppShell for breadcrumb support
+  static Widget _withAppShell(Widget screen) {
+    return AppShell(child: screen);
+  }
+
+  /// Wrap a SlideRoute builder with AppShell
+  static SlideRoute<T> _slideWithAppShell<T>(WidgetBuilder builder) {
+    return SlideRoute<T>(builder: (context) => _withAppShell(builder(context)));
+  }
+
   /// Get route settings for MaterialApp
   static Map<String, WidgetBuilder> getRoutes() {
     return {
       login: (context) => const LoginScreen(),
       companySelection: (context) => const CompanySelectionScreen(),
       '/invite/accept': (context) => const InviteAcceptScreen(),
-      dashboard: (context) => const DashboardScreen(),
-      contacts: (context) => const ContactsListScreen(),
-      organizations: (context) => const OrganizationsListScreen(),
-      accounts: (context) => const AccountsListScreen(),
-      accountCreate: (context) => const AccountCreateScreen(),
-      leads: (context) => const LeadsListScreen(),
-      taskCreate: (context) => const TaskCreateScreen(),
-      leadCreate: (context) => const LeadCreateScreen(),
-      tasks: (context) => const TasksListScreen(),
-      tickets: (context) => const TicketsListScreen(),
-      ticketCreate: (context) => const TicketCreateScreen(),
+      dashboard: (context) => _withAppShell(const DashboardScreen()),
+      contacts: (context) => _withAppShell(const ContactsListScreen()),
+      organizations: (context) =>
+          _withAppShell(const OrganizationsListScreen()),
+      accounts: (context) => _withAppShell(const AccountsListScreen()),
+      accountCreate: (context) => _withAppShell(const AccountCreateScreen()),
+      leads: (context) => _withAppShell(const LeadsListScreen()),
+      taskCreate: (context) => _withAppShell(const TaskCreateScreen()),
+      leadCreate: (context) => _withAppShell(const LeadCreateScreen()),
+      tasks: (context) => _withAppShell(const TasksListScreen()),
+      tickets: (context) => _withAppShell(const TicketsListScreen()),
+      // ticketCreate handled in onGenerateRoute to support optional accountId
       // wrap admin routes with the route guard - these return a WidgetBuilder
-      adminUsers: (context) => managerOrAdminGuarded((c) => const UsersListScreen())(context),
-      adminInvite: (context) => managerOrAdminGuarded((c) => const InviteUserScreen())(context),
-      adminRoles: (context) => adminGuarded((c) => const RolesListScreen())(context),
-      adminInvitations: (context) => managerOrAdminGuarded((c) => const InvitationsScreen())(context),
-      activityLogs: (context) => adminGuarded((c) => const ActivityLogsScreen())(context),
-      adminCustomers: (context) => managerOrAdminGuarded((c) => const AdminCustomersScreen())(context),
-      adminCustomerOrgs: (context) => managerOrAdminGuarded((c) => const CustomerOrganizationScreen())(context),
-      adminDomainMappings: (context) => managerOrAdminGuarded((c) => const DomainMappingScreen())(context),
-      interactions: (context) => const InteractionsListScreen(),
-      contactCreate: (context) => const ContactCreateScreen(),
-      
-      // Customer Portal routes
-      customerLogin: (context) => const CustomerLoginScreen(),
-      customerRegister: (context) => const CustomerRegisterScreen(),
-      customerPortal: (context) => const CustomerPortalScreen(),
-      customerTickets: (context) => const CustomerTicketsListScreen(),
-      customerTicketCreate: (context) => const CreateTicketScreen(),
-      customerProfile: (context) => const CustomerProfileScreen(),
-      customerEditProfile: (context) => const CustomerEditProfileScreen(),
-      customerChangePassword: (context) => const CustomerChangePasswordScreen(),
+      adminUsers: (context) => _withAppShell(
+        managerOrAdminGuarded((c) => const UsersListScreen())(context),
+      ),
+      adminInvite: (context) => _withAppShell(
+        managerOrAdminGuarded((c) => const InviteUserScreen())(context),
+      ),
+      adminRoles: (context) =>
+          _withAppShell(adminGuarded((c) => const RolesListScreen())(context)),
+      adminInvitations: (context) => _withAppShell(
+        managerOrAdminGuarded((c) => const InvitationsScreen())(context),
+      ),
+      activityLogs: (context) => _withAppShell(
+        adminGuarded((c) => const ActivityLogsScreen())(context),
+      ),
+      adminDomainMappings: (context) => _withAppShell(
+        managerOrAdminGuarded((c) => const DomainMappingScreen())(context),
+      ),
+      interactions: (context) => _withAppShell(const InteractionsListScreen()),
+      contactCreate: (context) => _withAppShell(const ContactCreateScreen()),
       // contactDetail: (context) => const ContactDetailScreen(),
       // leadCreate: (context) => const LeadCreateScreen(),
       // leadDetail: (context) => const LeadDetailScreen(),
@@ -319,106 +327,133 @@ class AppRouter {
       case adminUserDetail:
         final args = settings.arguments as UserDetailArgs?;
         if (args != null) {
-          if (!locator<AuthService>().isManagerOrAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
-          return FadeRoute<Object?>(builder: (context) => UserDetailScreen(userId: args.userId));
+          if (!locator<AuthService>().isManagerOrAdmin)
+            return FadeRoute<Object?>(
+              builder: (context) => const AccessDeniedRedirectScreen(),
+            );
+          return FadeRoute<Object?>(
+            builder: (context) => UserDetailScreen(userId: args.userId),
+          );
         }
         break;
       case adminUserEdit:
         final editArgs = settings.arguments as UserDetailArgs?;
         if (editArgs != null) {
-          if (!locator<AuthService>().isManagerOrAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
-          return FadeRoute<Object?>(builder: (context) => UserEditScreen(userId: editArgs.userId));
+          if (!locator<AuthService>().isManagerOrAdmin)
+            return FadeRoute<Object?>(
+              builder: (context) => const AccessDeniedRedirectScreen(),
+            );
+          return FadeRoute<Object?>(
+            builder: (context) => UserEditScreen(userId: editArgs.userId),
+          );
         }
         break;
       case activityLogs:
         final args = settings.arguments as ActivityLogsArgs?;
         if (args != null) {
-          if (!locator<AuthService>().isAdmin) return FadeRoute<Object?>(builder: (context) => const AccessDeniedRedirectScreen());
+          if (!locator<AuthService>().isAdmin)
+            return FadeRoute<Object?>(
+              builder: (context) => const AccessDeniedRedirectScreen(),
+            );
           return FadeRoute<Object?>(builder: (context) => ActivityLogsScreen());
         }
         break;
-            case accountDetail:
-              final args = settings.arguments as AccountDetailArgs?;
-              if (args != null) {
-                return SlideRoute<Object?>(
-                  builder: (context) => AccountDetailScreen(accountId: args.accountId),
-                );
-              }
-            case accountEdit:
-              final argsEdit = settings.arguments as AccountDetailArgs?;
-              if (argsEdit != null) {
-                return SlideRoute<Object?>(builder: (context) => AccountEditScreen(accountId: argsEdit.accountId));
-              }
-              break;
-      case contactDetail:
-        final args = settings.arguments as ContactDetailArgs?;
+      case accountDetail:
+        final args = settings.arguments as AccountDetailArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(
-            builder: (context) => ContactDetailScreen(contactId: args.contactId),
+          return _slideWithAppShell<Object?>(
+            (context) => AccountDetailScreen(accountId: args.accountId),
+          );
+        }
+      case accountEdit:
+        final argsEdit = settings.arguments as AccountEditArgs?;
+        if (argsEdit != null) {
+          return _slideWithAppShell<Object?>(
+            (context) => AccountEditScreen(accountId: argsEdit.accountId),
           );
         }
         break;
-        case contactEdit:
-          final ca = settings.arguments as ContactEditArgs?;
-          if (ca != null) {
-            return SlideRoute<Object?>(builder: (context) => ContactEditScreen(contactId: ca.contactId));
-          }
-          // If args are missing show a helpful error page instead of returning null
-          return SlideRoute<Object?>(builder: (context) => Scaffold(
-            appBar: AppBar(title: const Text('Edit contact')), 
-            body: Center(child: Text('Missing contact ID for edit route')), 
-          ));
+      case contactDetail:
+        final args = settings.arguments as ContactDetailArgs?;
+        if (args != null) {
+          return _slideWithAppShell<Object?>(
+            (context) => ContactDetailScreen(contactId: args.contactId),
+          );
+        }
+        break;
+      case contactEdit:
+        final ca = settings.arguments as ContactEditArgs?;
+        if (ca != null) {
+          return _slideWithAppShell<Object?>(
+            (context) => ContactEditScreen(contactId: ca.contactId),
+          );
+        }
+        // If args are missing show a helpful error page instead of returning null
+        return _slideWithAppShell<Object?>(
+          (context) => Scaffold(
+            appBar: AppBar(title: const Text('Edit contact')),
+            body: Center(child: Text('Missing contact ID for edit route')),
+          ),
+        );
       case leadDetail:
         final args = settings.arguments as LeadDetailArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(
-            builder: (context) => LeadDetailScreen(leadId: args.leadId),
+          return _slideWithAppShell<Object?>(
+            (context) => LeadDetailScreen(leadId: args.leadId),
           );
         }
         break;
       case leadEdit:
         final args = settings.arguments as LeadEditArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(builder: (context) => LeadEditScreen(leadId: args.leadId));
+          return _slideWithAppShell<Object?>(
+            (context) => LeadEditScreen(leadId: args.leadId),
+          );
         }
         break;
       case taskDetail:
         final args = settings.arguments as TaskDetailArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(
-            builder: (context) => TaskDetailScreen(taskId: args.taskId),
+          return _slideWithAppShell<Object?>(
+            (context) => TaskDetailScreen(taskId: args.taskId),
           );
         }
         break;
       case taskEdit:
         final args = settings.arguments as TaskEditArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(builder: (context) => TaskEditScreen(taskId: args.taskId));
+          return _slideWithAppShell<Object?>(
+            (context) => TaskEditScreen(taskId: args.taskId),
+          );
         }
         break;
       case ticketDetail:
         final args = settings.arguments as TicketDetailArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(
-            builder: (context) => TicketDetailScreen(ticketId: args.ticketId),
+          return _slideWithAppShell<Object?>(
+            (context) => TicketDetailScreen(ticketId: args.ticketId),
           );
         }
         break;
+      case ticketCreate:
+        final args = settings.arguments;
+        // Support both String (accountId) and TicketCreateArgs
+        final accountId = args is String ? args : (args as TicketCreateArgs?)?.accountId;
+        return _slideWithAppShell<Object?>(
+          (context) => TicketCreateScreen(accountId: accountId),
+        );
       case ticketEdit:
         final args = settings.arguments as TicketEditArgs?;
         if (args != null) {
-          return SlideRoute<Object?>(builder: (context) => TicketEditScreen(ticketId: args.ticketId));
-        }
-        break;
-      case customerTicketDetail:
-        final args = settings.arguments as CustomerTicketDetailArgs?;
-        if (args != null) {
-          return SlideRoute<Object?>(builder: (context) => CustomerTicketDetailScreen(ticketId: args.ticketId));
+          return _slideWithAppShell<Object?>(
+            (context) => TicketEditScreen(ticketId: args.ticketId),
+          );
         }
         break;
       case adminInvite:
-        return FadeRoute<Object?>(builder: (context) => const InviteUserScreen());
-      
+        return FadeRoute<Object?>(
+          builder: (context) => const InviteUserScreen(),
+        );
     }
     return null;
   }

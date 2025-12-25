@@ -1,11 +1,11 @@
 import { spawn } from 'child_process';
 import fetch from 'node-fetch';
 
-const BASE_URL = `http://localhost:${process.env.PORT || 3001}`;
+const BASE_URL = `http://localhost:${process.env.PORT || 3001}/api`;
 let serverProc;
 
 export async function spawnServer() {
-  serverProc = spawn('node', ['index.js'], { env: { ...process.env, NODE_ENV: 'test', PORT: process.env.PORT || 3001 } });
+  serverProc = spawn('node', ['server.js'], { env: { ...process.env, NODE_ENV: 'test', PORT: process.env.PORT || 3001 } });
   serverProc.stdout.on('data', (d) => process.stdout.write(`[server] ${d}`));
   serverProc.stderr.on('data', (d) => process.stderr.write(`[server:err] ${d}`));
 }
@@ -56,7 +56,7 @@ export async function stopServer() {
 export async function createAdminUserAndOrg() {
   const random = Math.floor(Math.random() * 1000000);
   const email = `testadmin+${random}@example.com`;
-  const authRes = await fetch(`${BASE_URL}/auth/google`, {
+  const authRes = await fetch(`${BASE_URL}/auth/staff/google`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, name: 'Test Admin', googleId: `test-google-${random}@example.com` })
   });
@@ -65,7 +65,7 @@ export async function createAdminUserAndOrg() {
 }
 
 export async function createOrganization(adminToken, name) {
-  const orgRes = await fetch(`${BASE_URL}/organizations`, {
+  const orgRes = await fetch(`${BASE_URL}/admin/organizations`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
     body: JSON.stringify({ name: name || 'Test Org', description: 'For integration testing' })
   });

@@ -5,6 +5,7 @@ import { requireOrganization } from '../../middleware/requireOrganization.js';
 import { authorize } from '../../middleware/permissions.js';
 import { validateTask } from '../../middleware/validation.js';
 import { createActivityLogEntry } from '../../services/activityService.js';
+import { validateTaskAssignee } from '../../middleware/taskPermissions.js';
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
     if (overdue === 'true') {
       where.AND = [
         { dueDate: { lt: new Date() } },
-        { status: { not: 'Completed' } }
+        { status: { not: 'COMPLETED' } }
       ];
     }
     
@@ -72,17 +73,89 @@ router.get('/', async (req, res) => {
 });
 
 // POST / - Create task
-router.post('/', authorize(['CREATE_TASKS']), validateTask, async (req, res) => {
+router.post('/', authorize(['CREATE_TASKS']), validateTask, validateTaskAssignee, async (req, res) => {
   try {
+    const { 
+      subject, description, status, priority, dueDate, 
+      ownerId, accountId, contactId, leadId, opportunityId, caseId 
+    } = req.body;
+
+    // Validate accountId if provided
+    if (accountId) {
+      const account = await prisma.account.findFirst({
+        where: { id: accountId, organizationId: req.organizationId }
+      });
+      if (!account) {
+        return res.status(400).json({ message: 'Invalid account ID or account not found' });
+      }
+    }
+
+    // Validate contactId if provided
+    if (contactId) {
+      const contact = await prisma.contact.findFirst({
+        where: { id: contactId, organizationId: req.organizationId }
+      });
+      if (!contact) {
+        return res.status(400).json({ message: 'Invalid contact ID or contact not found' });
+      }
+    }
+
+    // Validate leadId if provided
+    if (leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: { id: leadId, organizationId: req.organizationId }
+      });
+      if (!lead) {
+        return res.status(400).json({ message: 'Invalid lead ID or lead not found' });
+      }
+    }
+
+    const statusMap = {
+      'Not Started': 'NOT_STARTED',
+      'In Progress': 'IN_PROGRESS',
+      'Completed': 'COMPLETED',
+      'Cancelled': 'CANCELLED'
+    };
+    
+    const priorityMap = {
+      'High': 'HIGH',
+      'Normal': 'NORMAL',
+      'Low': 'LOW'
+    };
+
+    // Helper to sanitize inputs (convert empty strings/nulls to undefined)
+    const sanitize = (val) => (val === '' || val === null ? undefined : val);
+
     const task = await prisma.task.create({
       data: {
-        ...req.body,
+        subject,
+        description: sanitize(description),
+        status: statusMap[status] || (Object.values(statusMap).includes(status) ? status : undefined),
+        priority: priorityMap[priority] || (Object.values(priorityMap).includes(priority) ? priority : undefined),
+        dueDate: sanitize(dueDate) ? new Date(sanitize(dueDate)) : undefined,
+        ownerId: sanitize(ownerId),
+        accountId: sanitize(accountId),
+        contactId: sanitize(contactId),
+        leadId: sanitize(leadId),
+        opportunityId: sanitize(opportunityId),
+        caseId: sanitize(caseId),
         organizationId: req.organizationId,
         createdById: req.user.id
       }
     });
+
+    await createActivityLogEntry({
+      action: 'TASK_CREATED',
+      entityType: 'Task',
+      entityId: task.id,
+      description: `Task ${task.subject} created by ${req.user.email}`,
+      userId: req.user.id,
+      organizationId: req.organizationId
+    });
+
     res.status(201).json(task);
   } catch (error) {
+    console.error('Task creation error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -110,10 +183,71 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PUT /:id - Update task
-router.put('/:id', authorize(['EDIT_TASKS']), async (req, res) => {
+// GET /:id/activities - Get task activity log
+router.get('/:id/activities', async (req, res) => {
   try {
-    const existing = await prisma.task.findFirst({ where: { id: req.params.id, organizationId: req.organizationId } });
+    const { page = 1, limit = 20 } = req.query;
+    const _page = Math.max(parseInt(page), 1);
+    const _limit = Math.min(parseInt(limit), 100);
+    const skip = (_page - 1) * _limit;
+
+    // Verify task exists
+    const task = await prisma.task.findFirst({
+      where: {
+        id: req.params.id,
+        organizationId: req.organizationId
+      }
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const total = await prisma.activityLog.count({
+      where: {
+        entityType: 'Task',
+        entityId: req.params.id,
+        organizationId: req.organizationId
+      }
+    });
+
+    const activities = await prisma.activityLog.findMany({
+      where: {
+        entityType: 'Task',
+        entityId: req.params.id,
+        organizationId: req.organizationId
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: _limit
+    });
+
+    res.json({
+      activities,
+      pagination: {
+        page: _page,
+        limit: _limit,
+        total,
+        totalPages: Math.ceil(total / _limit),
+        hasNext: _page * _limit < total,
+        hasPrev: _page > 1
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PUT /:id - Update task
+router.put('/:id', authorize(['EDIT_TASKS']), validateTaskAssignee, async (req, res) => {
+  try {
+    const existing = await prisma.task.findFirst({ 
+      where: { id: req.params.id, organizationId: req.organizationId },
+      include: { owner: { select: { name: true, email: true } } }
+    });
     if (!existing) return res.status(404).json({ message: 'Task not found' });
     
     const oldValues = {};
@@ -123,17 +257,43 @@ router.put('/:id', authorize(['EDIT_TASKS']), async (req, res) => {
       newValues[k] = req.body[k]; 
     });
     
-    const updated = await prisma.task.update({ where: { id: req.params.id }, data: req.body });
+    // Check if owner is being reassigned
+    const isReassignment = req.body.ownerId && req.body.ownerId !== existing.ownerId;
     
-    await createActivityLogEntry({ 
-      action: 'TASK_UPDATED', 
-      entityType: 'Task', 
-      entityId: updated.id, 
-      description: `Task updated by ${req.user.email}`, 
-      userId: req.user.id, 
-      organizationId: req.organizationId, 
-      metadata: { oldValues, newValues } 
+    const updated = await prisma.task.update({ 
+      where: { id: req.params.id }, 
+      data: req.body,
+      include: { owner: { select: { name: true, email: true } } }
     });
+    
+    // Log specific reassignment activity if owner changed
+    if (isReassignment) {
+      await createActivityLogEntry({ 
+        action: 'TASK_REASSIGNED', 
+        entityType: 'Task', 
+        entityId: updated.id, 
+        description: `Task reassigned from ${existing.owner?.name || 'Unassigned'} to ${updated.owner?.name || 'Unassigned'} by ${req.user.email}`, 
+        userId: req.user.id, 
+        organizationId: req.organizationId, 
+        metadata: { 
+          oldOwnerId: existing.ownerId, 
+          newOwnerId: updated.ownerId,
+          oldOwnerName: existing.owner?.name,
+          newOwnerName: updated.owner?.name
+        } 
+      });
+    } else {
+      // Log generic update activity
+      await createActivityLogEntry({ 
+        action: 'TASK_UPDATED', 
+        entityType: 'Task', 
+        entityId: updated.id, 
+        description: `Task updated by ${req.user.email}`, 
+        userId: req.user.id, 
+        organizationId: req.organizationId, 
+        metadata: { oldValues, newValues } 
+      });
+    }
     
     res.json(updated);
   } catch (error) {
@@ -144,15 +304,26 @@ router.put('/:id', authorize(['EDIT_TASKS']), async (req, res) => {
 // DELETE /:id - Delete task
 router.delete('/:id', authorize(['DELETE_TASKS']), async (req, res) => {
   try {
-    const task = await prisma.task.deleteMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      }
+    const existing = await prisma.task.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId }
     });
-    if (task.count === 0) {
-      return res.status(404).json({ message: 'Task not found' });
-    }
+
+    if (!existing) return res.status(404).json({ message: 'Task not found' });
+
+    await prisma.task.delete({
+      where: { id: req.params.id }
+    });
+
+    await createActivityLogEntry({
+      action: 'TASK_DELETED',
+      entityType: 'Task',
+      entityId: req.params.id,
+      description: `Task ${existing.subject} deleted by ${req.user.email}`,
+      userId: req.user.id,
+      organizationId: req.organizationId,
+      metadata: { task: existing }
+    });
+
     res.json({ message: 'Task deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

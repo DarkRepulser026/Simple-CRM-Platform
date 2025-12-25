@@ -200,6 +200,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                               _HeaderCell('Email', flex: 3),
                               _HeaderCell('Status', flex: 2),
                               _HeaderCell('Source', flex: 2),
+                              const SizedBox(width: 80), // Actions space
                             ],
                           ),
                         ),
@@ -347,6 +348,50 @@ class _LeadRow extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            // Actions
+            SizedBox(
+              width: 80,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (!lead.isConverted)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: 'Edit',
+                      onPressed: () async {
+                        final res = await AppRouter.navigateTo(
+                          context,
+                          AppRouter.leadEdit,
+                          arguments: LeadEditArgs(leadId: lead.id),
+                        );
+                        if (res == true) {
+                          // Refresh the list
+                          (context as Element).visitAncestorElements((element) {
+                            if (element.widget is LeadsListScreen) {
+                              final state = (element as StatefulElement).state as _LeadsListScreenState;
+                              state._refreshList();
+                              return false;
+                            }
+                            return true;
+                          });
+                        }
+                      },
+                    ),
+                  if (lead.isConverted)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Converted',
+                        style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

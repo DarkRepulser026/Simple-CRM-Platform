@@ -23,6 +23,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _typeCtrl = TextEditingController();
+  final _websiteCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   
   bool _isLoading = true;
   bool _isSaving = false;
@@ -36,6 +38,15 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _typeCtrl.dispose();
+    _websiteCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
@@ -44,6 +55,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
         _account = res.value;
         _nameCtrl.text = _account?.name ?? '';
         _typeCtrl.text = _account?.type ?? '';
+        _websiteCtrl.text = _account?.website ?? '';
+        _phoneCtrl.text = _account?.phone ?? '';
         setState(() => _isLoading = false);
       } else {
         throw Exception(res.error.message);
@@ -64,6 +77,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       final updated = _account!.copyWith(
         name: _nameCtrl.text.trim(),
         type: _typeCtrl.text.trim(),
+        website: _websiteCtrl.text.trim().isEmpty ? null : _websiteCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
         updatedAt: DateTime.now(),
       );
       final res = await _accountsService.updateAccount(updated);
@@ -166,6 +181,26 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                           prefixIcon: Icon(Icons.category_outlined, color: cs.onSurfaceVariant),
                           hintText: 'e.g. Customer, Partner, Reseller',
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _websiteCtrl,
+                        decoration: inputDecor.copyWith(
+                          labelText: 'Website',
+                          prefixIcon: Icon(Icons.language, color: cs.onSurfaceVariant),
+                          hintText: 'e.g. https://example.com',
+                        ),
+                        keyboardType: TextInputType.url,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _phoneCtrl,
+                        decoration: inputDecor.copyWith(
+                          labelText: 'Phone Number',
+                          prefixIcon: Icon(Icons.phone, color: cs.onSurfaceVariant),
+                          hintText: 'e.g. +1-234-567-8900',
+                        ),
+                        keyboardType: TextInputType.phone,
                       ),
                       
                       const SizedBox(height: 40),

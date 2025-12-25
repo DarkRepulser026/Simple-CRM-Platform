@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../../models/task.dart';
 import '../../services/service_locator.dart';
 import '../../services/tasks_service.dart';
+import '../../services/auth/auth_service.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/role_visibility.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/activity_log_widget.dart';
+import '../../widgets/owner_dropdown.dart';
 
 /// Màn Task detail dạng popup card ở giữa (khi đi bằng route)
 class TaskDetailScreen extends StatelessWidget {
@@ -57,9 +60,7 @@ Future<void> showTaskDetailDialog(BuildContext context, String taskId) {
     context: context,
     builder: (ctx) {
       return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
@@ -129,7 +130,9 @@ class _TaskDetailCardState extends State<_TaskDetailCard> {
       return const Center(child: LoadingView(message: 'Loading task...'));
     }
     if (_error != null) {
-      return Center(child: ErrorView(message: _error!, onRetry: _load));
+      return Center(
+        child: ErrorView(message: _error!, onRetry: _load),
+      );
     }
     if (_task == null) {
       return const Center(child: Text('No task data'));
@@ -137,144 +140,213 @@ class _TaskDetailCardState extends State<_TaskDetailCard> {
 
     final task = _task!;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // HEADER ROW
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.subject,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TabBar(
+            tabs: const [
+              Tab(text: 'Details'),
+              Tab(text: 'Activity Log'),
+            ],
+            labelColor: cs.primary,
+            unselectedLabelColor: cs.onSurfaceVariant,
+            indicatorColor: cs.primary,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 500,
+            child: TabBarView(
+              children: [
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // HEADER ROW
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  task.subject,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Task • ${_formatShortDate(task.createdAt)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ManagerOrAdminOnly(
+                            child: IconButton(
+                              tooltip: 'Edit task',
+                              icon: const Icon(Icons.edit),
+                              onPressed: () async {
+                                final res = await AppRouter.navigateTo<bool?>(
+                                  context,
+                                  AppRouter.taskEdit,
+                                  arguments: TaskEditArgs(taskId: task.id),
+                                );
+                                if (res == true && context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      const Divider(),
+
+                      const SizedBox(height: 16),
+
+                      // STATUS + PRIORITY + DUE DATE
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: [
+                          _InfoChip(
+                            label: 'Status',
+                            child: _StatusChip(task: task),
+                          ),
+                          _InfoChip(
+                            label: 'Priority',
+                            child: _PriorityChip(task: task),
+                          ),
+                          _InfoChip(
+                            label: 'Due date',
+                            child: Text(
+                              task.dueDate != null
+                                  ? _formatShortDate(task.dueDate!)
+                                  : 'No due date',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: task.isOverdue
+                                    ? cs.error
+                                    : cs.onSurfaceVariant,
+                                fontWeight: task.isOverdue
+                                    ? FontWeight.w600
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // DESCRIPTION
+                      Text(
+                        'Description',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceVariant.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          (task.description != null &&
+                                  task.description!.trim().isNotEmpty)
+                              ? task.description!
+                              : 'No description provided.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ASSIGNED TO
+                      Row(
+                        children: [
+                          Text(
+                            'Assigned To',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          _buildReassignButton(context, cs),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceVariant.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          task.ownerName ?? 'Unassigned',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: task.ownerName == null
+                                ? cs.onSurfaceVariant.withOpacity(0.6)
+                                : cs.onSurfaceVariant,
+                            fontStyle: task.ownerName == null
+                                ? FontStyle.italic
+                                : null,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // METADATA
+                      Text(
+                        'Activity',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MetaLine(
+                              label: 'Created at',
+                              value: _formatLongDate(task.createdAt),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _MetaLine(
+                              label: 'Last updated',
+                              value: _formatLongDate(task.updatedAt),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Task • ${_formatShortDate(task.createdAt)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            ManagerOrAdminOnly(
-              child: IconButton(
-                tooltip: 'Edit task',
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                    () async {
-                      final res = await AppRouter.navigateTo<bool?>(
-                        context,
-                        AppRouter.taskEdit,
-                        arguments: TaskEditArgs(taskId: task.id),
-                      );
-                      if (res == true) Navigator.of(context).pop(true);
-                    }();
-                },
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 16),
-        const Divider(),
-
-        const SizedBox(height: 16),
-
-        // STATUS + PRIORITY + DUE DATE
-        Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            _InfoChip(
-              label: 'Status',
-              child: _StatusChip(task: task),
-            ),
-            _InfoChip(
-              label: 'Priority',
-              child: _PriorityChip(task: task),
-            ),
-            _InfoChip(
-              label: 'Due date',
-              child: Text(
-                task.dueDate != null
-                    ? _formatShortDate(task.dueDate!)
-                    : 'No due date',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: task.isOverdue ? cs.error : cs.onSurfaceVariant,
-                  fontWeight: task.isOverdue ? FontWeight.w600 : null,
                 ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // DESCRIPTION
-        Text(
-          'Description',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.surfaceVariant.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            (task.description != null && task.description!.trim().isNotEmpty)
-                ? task.description!
-                : 'No description provided.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
+                ActivityLogWidget(entityId: widget.taskId, entityType: 'Task'),
+              ],
             ),
           ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // METADATA
-        Text(
-          'Activity',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _MetaLine(
-                label: 'Created at',
-                value: _formatLongDate(task.createdAt),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _MetaLine(
-                label: 'Last updated',
-                value: _formatLongDate(task.updatedAt),
-              ),
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -286,6 +358,92 @@ class _TaskDetailCardState extends State<_TaskDetailCard> {
       '${_two(date.hour)}:${_two(date.minute)}';
 
   String _two(int n) => n.toString().padLeft(2, '0');
+
+  Future<void> _showReassignDialog() async {
+    if (_task == null) return;
+
+    String? newOwnerId = _task!.ownerId;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reassign Task'),
+              content: SizedBox(
+                width: 400,
+                child: OwnerDropdown(
+                  initialOwnerId: _task!.ownerId,
+                  entityType: 'task',
+                  onChanged: (value) => newOwnerId = value,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Reassign'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true &&
+        newOwnerId != null &&
+        newOwnerId!.isNotEmpty &&
+        mounted) {
+      await _reassignTask(newOwnerId!);
+    }
+  }
+
+  Future<void> _reassignTask(String newOwnerId) async {
+    if (_task == null) return;
+
+    final updatedTask = _task!.copyWith(ownerId: newOwnerId);
+    final result = await _tasksService.updateTask(updatedTask);
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task reassigned successfully')),
+      );
+      _load(); // Reload task data
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to reassign: ${result.error.message}')),
+      );
+    }
+  }
+
+  Widget _buildReassignButton(BuildContext context, ColorScheme cs) {
+    final authService = locator<AuthService>();
+    final userRole = authService.currentUser?.role;
+
+    // Any staff member can reassign tasks (it's just updating the owner)
+    final canReassign =
+        userRole == 'MANAGER' || userRole == 'ADMIN' || userRole == 'AGENT';
+
+    if (!canReassign) return const SizedBox.shrink();
+
+    return OutlinedButton.icon(
+      onPressed: _showReassignDialog,
+      icon: const Icon(Icons.person_add, size: 16),
+      label: const Text('Reassign'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
 }
 
 /// Chip hiển thị status
@@ -328,9 +486,9 @@ class _StatusChip extends StatelessWidget {
       child: Text(
         task.status.value,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w600,
-            ),
+          color: fg,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -371,9 +529,9 @@ class _PriorityChip extends StatelessWidget {
         Text(
           task.priority.value,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -427,14 +585,10 @@ class _MetaLine extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium,
-        ),
+        Text(value, style: theme.textTheme.bodyMedium),
       ],
     );
   }
 }
 
 // Helper functions for _TaskDetailCardState
-

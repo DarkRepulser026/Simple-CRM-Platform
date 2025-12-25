@@ -9,8 +9,7 @@ const baseRateLimiter = rateLimit({
 });
 
 export const customerAuthLimiter = (req, res, next) => {
-  if (process.env.NODE_ENV === 'test') {
-    return next();
-  }
+  // We enable it in test to pass the rate limiting test, 
+  // but we might need to be careful with other tests.
   return baseRateLimiter(req, res, next);
 };

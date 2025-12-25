@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../models/dashboard_metrics.dart';
-import '../../models/activity_log.dart';
 import '../../services/auth/auth_service.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../services/service_locator.dart';
 import '../../services/dashboard_service.dart';
-import '../../services/users_service.dart';
-import '../../services/roles_service.dart';
-import '../../models/user.dart';
-import '../../models/user_role.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../navigation/app_router.dart';
-import '../admin/user_detail_screen.dart' as user_detail;
-import 'admin_metrics_grid.dart';
 import '../../widgets/role_visibility.dart';
+import '../../widgets/dashboard/kpi_card.dart';
+import '../../widgets/dashboard/work_queue_widget.dart';
+import '../../widgets/dashboard/recent_activity_widget.dart';
+import '../../widgets/dashboard/upcoming_tasks_widget.dart';
+import '../../services/dashboard_service.dart' show WorkQueueItem, TaskItem;
 
 /// Dashboard screen showing business metrics and navigation to main features
 class DashboardScreen extends StatefulWidget {
@@ -27,8 +25,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final AuthService _authService;
   late final DashboardService _dashboardService;
-  late final UsersService _usersService;
-  late final RolesService _rolesService;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -45,25 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initializeServices() async {
     _authService = locator<AuthService>();
     _dashboardService = locator<DashboardService>();
-    _usersService = locator<UsersService>();
-    _rolesService = locator<RolesService>();
     await _loadDashboard();
-  }
-
-  Future<List<User>> _fetchPreviewUsers() async {
-    try {
-      final res = await _usersService.getUsers(limit: 5);
-      if (res.isSuccess) return res.value.users;
-    } catch (_) {}
-    return [];
-  }
-
-  Future<List<UserRole>> _fetchPreviewRoles() async {
-    try {
-      final res = await _rolesService.getRoles(limit: 5);
-      if (res.isSuccess) return res.value.roles;
-    } catch (_) {}
-    return [];
   }
 
   Future<void> _loadDashboard() async {
@@ -203,70 +181,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  AdminMetricsGrid(metrics: _metrics!),
-                  const SizedBox(height: 32),
-
-                  _buildManageTableRow(isSmallScreen: isSmallScreen),
-                  const SizedBox(height: 24),
-
-                  if (!isSmallScreen)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: _buildMetricRow('Weekly Performance', [
-                            _CompactMetricCard(
-                              title: 'Leads',
-                              value: _metrics!.leadsThisWeek.toString(),
-                              icon: Icons.bolt_rounded,
-                              color: Colors.amber[700]!, // Màu vàng cam
-                            ),
-                            _CompactMetricCard(
-                              title: 'Resolved',
-                              value: _metrics!.ticketsResolvedThisWeek
-                                  .toString(),
-                              icon: Icons.check_circle_outline_rounded,
-                              color: Colors.teal[600] ?? Colors.green,
-                            ),
-                            _CompactMetricCard(
-                              title: 'Completed',
-                              value: _metrics!.tasksCompletedThisWeek
-                                  .toString(),
-                              icon: Icons.done_all_rounded,
-                              color: Colors.indigo[500]!,
-                            ),
-                          ]),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(flex: 4, child: _buildRecentActivities()),
-                      ],
-                    )
-                  else ...[
-                    _buildMetricRow('Weekly Performance', [
-                      _CompactMetricCard(
-                        title: 'Leads',
-                        value: _metrics!.leadsThisWeek.toString(),
-                        icon: Icons.bolt_rounded,
-                        color: Colors.amber[700]!,
-                      ),
-                      _CompactMetricCard(
-                        title: 'Resolved',
-                        value: _metrics!.ticketsResolvedThisWeek.toString(),
-                        icon: Icons.check_circle_outline_rounded,
-                        // FIX LỖI Ở ĐÂY:
-                        color: Colors.teal[600] ?? Colors.green,
-                      ),
-                      _CompactMetricCard(
-                        title: 'Completed',
-                        value: _metrics!.tasksCompletedThisWeek.toString(),
-                        icon: Icons.done_all_rounded,
-                        color: Colors.indigo[500]!,
-                      ),
-                    ]),
-                    const SizedBox(height: 24),
-                    _buildRecentActivities(),
-                  ],
+                  // Role-based dashboard per ARCHITECTURE_PATTERNS.md
+                  _buildRoleBasedDashboard(),
                 ],
               ),
             ),
@@ -276,272 +192,320 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Helper method để render User/Role section
-  Widget _buildManageTableRow({required bool isSmallScreen}) {
-    if (isSmallScreen) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildUsersPreview(),
-          const SizedBox(height: 16),
-          _buildRolesPreview(),
-        ],
-      );
-    }
-    return Row(
+  // Build role-based dashboard per ARCHITECTURE_PATTERNS.md
+  Widget _buildRoleBasedDashboard() {
+    final userRole = (_authService.currentUser?.role ?? 'AGENT').toUpperCase();
+    
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildUsersPreview()),
-        const SizedBox(width: 24),
-        Expanded(child: _buildRolesPreview()),
+        // Admin Dashboard (only visible to admins)
+        AdminOnly(
+          child: Column(
+            children: [
+              _buildAdminDashboard(),
+              const SizedBox(height: 48),
+            ],
+          ),
+        ),
+        
+        // Manager Dashboard (visible to managers and below)
+        if (userRole == 'MANAGER')
+          _buildManagerDashboard()
+        else if (userRole == 'AGENT' || userRole != 'ADMIN')
+          _buildAgentDashboard(),
       ],
     );
   }
 
-  Widget _buildUsersPreview() {
-    return FutureBuilder<List<User>>(
-      future: _fetchPreviewUsers(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-        final users = snapshot.data ?? [];
-        return _DashboardCard(
-          title: 'User Management',
-          icon: Icons.people_alt_rounded,
-          accentColor: Colors.blue[600], // Thêm màu nhấn
-          trailing: AdminOnly(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () =>
-                      AppRouter.navigateTo(context, AppRouter.adminUsers),
-                  child: const Text('Manage'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.blue[600],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () => _showUserDialog(context),
-                  child: const Text('Create'),
-                ),
-              ],
-            ),
-          ),
-          child: Column(
-            children: users.map((u) {
-              return Column(
-                children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    leading: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Colors.blue[50],
-                      child: Text(
-                        u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      u.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      u.email,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                    trailing: AdminOnly(
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.more_vert,
-                          size: 20,
-                          color: Colors.grey[400],
-                        ),
-                        onPressed: () =>
-                            _showUserDialog(context, user: u), // Shortcut edit
-                      ),
-                    ),
-                    onTap: () async {
-                      final res = await user_detail.showAdminUserDetailDialog(
-                        context,
-                        userId: u.id,
-                      );
-                      if (res == true) _loadDashboard();
-                    },
-                  ),
-                  if (u != users.last) const Divider(height: 8, thickness: 0.5),
-                ],
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRolesPreview() {
-    return FutureBuilder<List<UserRole>>(
-      future: _fetchPreviewRoles(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-        final roles = snapshot.data ?? [];
-        return _DashboardCard(
-          title: 'Role Settings',
-          icon: Icons.shield_rounded,
-          accentColor: Colors.deepPurple[500], // Màu nhấn tím
-          trailing: AdminOnly(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () =>
-                      AppRouter.navigateTo(context, AppRouter.adminRoles),
-                  child: const Text('Manage'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.deepPurple[500],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () => _showRoleDialog(context),
-                  child: const Text('Create'),
-                ),
-              ],
-            ),
-          ),
-          child: Column(
-            children: roles.map((r) {
-              return Column(
-                children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple[50],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.lock_outline,
-                        size: 20,
-                        color: Colors.deepPurple[400],
-                      ),
-                    ),
-                    title: Text(
-                      r.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      r.roleType.value,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                    onTap: () =>
-                        AppRouter.navigateTo(context, AppRouter.adminRoles),
-                  ),
-                  if (r != roles.last) const Divider(height: 8, thickness: 0.5),
-                ],
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMetricRow(String sectionTitle, List<Widget> cards) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 720 && cards.length <= 3;
-        Widget metricsLayout;
-        if (isWide) {
-          metricsLayout = Row(
-            children: [
-              for (int i = 0; i < cards.length; i++) ...[
-                Expanded(child: cards[i]),
-                if (i != cards.length - 1) const SizedBox(width: 16),
-              ],
-            ],
-          );
-        } else {
-          metricsLayout = Wrap(spacing: 16, runSpacing: 16, children: cards);
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              sectionTitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.blueGrey[800],
-              ),
-            ),
-            const SizedBox(height: 16),
-            metricsLayout,
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildRecentActivities() {
-    if (_metrics == null || _metrics!.recentActivities.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final activities = _metrics!.recentActivities.take(6).toList();
-
+  Widget _buildAgentDashboard() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Recent Activity',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.blueGrey[800],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
+        // KPI Cards (max 5 per ARCHITECTURE_PATTERNS.md)
+        Wrap(
+          alignment: WrapAlignment.start,
+          runAlignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          spacing: 20,
+          runSpacing: 20,
+          children: [
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'My Open Tickets',
+                value: _metrics!.openTickets.toString(),
+                icon: Icons.confirmation_number_outlined,
+                color: Colors.blue[600]!,
+                onTap: () => AppRouter.navigateTo(
+                  context,
+                  '${AppRouter.tickets}?status=OPEN',
+                ),
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < activities.length; i++) ...[
-                _ActivityTimelineTile(
-                  log: activities[i],
-                  isFirst: i == 0,
-                  isLast: i == activities.length - 1,
-                  onTap: () {
-                    // Logic navigate activity log
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Overdue Tasks',
+                value: _metrics!.overdueTasks.toString(),
+                icon: Icons.warning_amber_rounded,
+                color: Colors.red[600]!,
+                onTap: () => AppRouter.navigateTo(
+                  context,
+                  '${AppRouter.tasks}?overdue=true',
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Pending Tasks',
+                value: _metrics!.pendingTasks.toString(),
+                icon: Icons.schedule,
+                color: Colors.orange[600]!,
+                onTap: () => AppRouter.navigateTo(
+                  context,
+                  AppRouter.tasks,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        
+        // My Tickets Queue (read-only, clickable)
+        FutureBuilder<List<WorkQueueItem>>(
+          future: _dashboardService.getMyWork().then((r) {
+            if (kDebugMode && !r.isSuccess) {
+              print('❌ My Work Error: ${r.error.message}');
+            }
+            return r.isSuccess ? r.value : <WorkQueueItem>[];
+          }),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorView(
+                message: 'Failed to load work items: ${snapshot.error}',
+                onRetry: () => setState(() {}),
+              );
+            }
+            return WorkQueueWidget(
+              items: snapshot.data ?? [],
+              title: 'My Tickets',
+              emptyMessage: 'No tickets assigned to you 🎉',
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        
+        // Upcoming Tasks + Recent Activity
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 900) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: FutureBuilder<Map<String, dynamic>>(
+                      future: _dashboardService.getUpcomingTasks().then((r) {
+                        if (kDebugMode && !r.isSuccess) {
+                          print('❌ Upcoming Tasks Error: ${r.error.message}');
+                        }
+                        return r.isSuccess ? Map<String, dynamic>.from(r.value) : {};
+                      }),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        final data = snapshot.data!;
+                        final tasks = (data['tasks'] as List<dynamic>?)
+                            ?.map((t) => TaskItem.fromJson(t))
+                            .toList() ?? [];
+                        return UpcomingTasksWidget(tasks: tasks);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: RecentActivityWidget(
+                      activities: _metrics!.recentActivities,
+                      maxItems: 8,
+                    ),
+                  ),
+                ],
+              );
+            }
+            return Column(
+              children: [
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _dashboardService.getUpcomingTasks().then((r) {
+                    if (kDebugMode && !r.isSuccess) {
+                      print('❌ Upcoming Tasks Error: ${r.error.message}');
+                    }
+                    return r.isSuccess ? Map<String, dynamic>.from(r.value) : {};
+                  }),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final data = snapshot.data!;
+                    final tasks = (data['tasks'] as List<dynamic>?)
+                        ?.map((t) => TaskItem.fromJson(t))
+                        .toList() ?? [];
+                    return UpcomingTasksWidget(tasks: tasks);
                   },
                 ),
+                const SizedBox(height: 16),
+                RecentActivityWidget(
+                  activities: _metrics!.recentActivities,
+                  maxItems: 8,
+                ),
               ],
-            ],
-          ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManagerDashboard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Manager KPI Cards
+        Wrap(
+          alignment: WrapAlignment.start,
+          runAlignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          spacing: 20,
+          runSpacing: 20,
+          children: [
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Open Tickets (Org)',
+                value: _metrics!.openTickets.toString(),
+                icon: Icons.confirmation_number_outlined,
+                color: Colors.blue[600]!,
+                onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+              ),
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Overdue Tickets',
+                value: _metrics!.overdueTickets.toString(),
+                icon: Icons.warning_amber_rounded,
+                color: Colors.red[600]!,
+                trend: '+${_metrics!.overdueTickets}',
+                trendIsPositive: false,
+                onTap: () => AppRouter.navigateTo(
+                  context,
+                  AppRouter.tickets,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Active Leads',
+                value: _metrics!.totalLeads.toString(),
+                icon: Icons.bolt_rounded,
+                color: Colors.amber[700]!,
+                onTap: () => AppRouter.navigateTo(context, AppRouter.leads),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        
+        // Team Work Queue (Manager+)
+        FutureBuilder<Map<String, dynamic>>(
+          future: _dashboardService.getTeamWork().then((r) {
+            if (kDebugMode && !r.isSuccess) {
+              print('❌ Team Work Error: ${r.error.message}');
+            }
+            return r.isSuccess ? Map<String, dynamic>.from(r.value) : {};
+          }),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorView(
+                message: 'Failed to load team work: ${snapshot.error}',
+                onRetry: () => setState(() {}),
+              );
+            }
+            final data = snapshot.data ?? {};
+            final unassigned = (data['unassigned'] as List<dynamic>?)
+                ?.map((item) => WorkQueueItem.fromJson(item))
+                .toList() ?? [];
+            return WorkQueueWidget(
+              items: unassigned,
+              title: 'Unassigned / At Risk',
+              emptyMessage: 'All items are assigned ✓',
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        
+        // Recent Activity
+        RecentActivityWidget(
+          activities: _metrics!.recentActivities,
+          maxItems: 10,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdminDashboard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Admin KPI Cards - System Health
+        Wrap(
+          alignment: WrapAlignment.start,
+          runAlignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          spacing: 20,
+          runSpacing: 20,
+          children: [
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Active Users',
+                value: _metrics!.activeUsersThisWeek.toString(),
+                icon: Icons.people_alt_rounded,
+                color: Colors.indigo[600]!,
+                onTap: () => AppRouter.navigateTo(context, AppRouter.adminUsers),
+              ),
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Accounts',
+                value: _metrics!.totalAccounts.toString(),
+                icon: Icons.business_outlined,
+                color: Colors.teal[600]!,
+                onTap: () => AppRouter.navigateTo(context, AppRouter.accounts),
+              ),
+            ),
+            SizedBox(
+              width: 240,
+              child: KpiCard(
+                title: 'Total Tickets',
+                value: _metrics!.totalTickets.toString(),
+                icon: Icons.confirmation_number_outlined,
+                color: Colors.blue[600]!,
+                onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -580,57 +544,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       const SizedBox(height: 40),
+      
+      // 🔹 WORKSPACE SECTION
+      Padding(
+        padding: const EdgeInsets.only(left: 12, bottom: 8, top: 8),
+        child: Text(
+          'WORKSPACE',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
       _SidebarItem(
         icon: Icons.grid_view_rounded,
         label: 'Overview',
         isSelected: true,
         onTap: () {},
-      ),
-      ManagerOrAdminOnly(
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-          childrenPadding: EdgeInsets.zero,
-          initiallyExpanded: _adminExpanded,
-          onExpansionChanged: (v) => setState(() => _adminExpanded = v),
-          shape: const Border(),
-          leading: const Icon(Icons.shield_outlined, size: 20),
-          title: const Text('Admin', style: TextStyle(fontSize: 14)),
-          children: [
-            _SidebarSubItem(
-              label: 'Users',
-              onTap: () => AppRouter.navigateTo(context, AppRouter.adminUsers),
-            ),
-            _SidebarSubItem(
-              label: 'Roles',
-              onTap: () => AppRouter.navigateTo(context, AppRouter.adminRoles),
-            ),
-            _SidebarSubItem(
-              label: 'Activity Logs',
-              onTap: () =>
-                  AppRouter.navigateTo(context, AppRouter.activityLogs),
-            ),
-            _SidebarSubItem(
-              label: 'Customers',
-              onTap: () =>
-                  AppRouter.navigateTo(context, AppRouter.adminCustomers),
-            ),
-            _SidebarSubItem(
-              label: 'Customer Orgs',
-              onTap: () =>
-                  AppRouter.navigateTo(context, AppRouter.adminCustomerOrgs),
-            ),
-            _SidebarSubItem(
-              label: 'Domain Mappings',
-              onTap: () =>
-                  AppRouter.navigateTo(context, AppRouter.adminDomainMappings),
-            ),
-          ],
-        ),
-      ),
-      _SidebarItem(
-        icon: Icons.people_outline,
-        label: 'Contacts',
-        onTap: () => AppRouter.navigateTo(context, AppRouter.contacts),
       ),
       _SidebarItem(
         icon: Icons.trending_up_rounded,
@@ -638,14 +570,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: () => AppRouter.navigateTo(context, AppRouter.leads),
       ),
       _SidebarItem(
-        icon: Icons.task_outlined,
-        label: 'Tasks',
-        onTap: () => AppRouter.navigateTo(context, AppRouter.tasks),
+        icon: Icons.business_outlined,
+        label: 'Accounts',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.accounts),
       ),
       _SidebarItem(
         icon: Icons.confirmation_number_outlined,
         label: 'Tickets',
         onTap: () => AppRouter.navigateTo(context, AppRouter.tickets),
+      ),
+      _SidebarItem(
+        icon: Icons.task_outlined,
+        label: 'Tasks',
+        onTap: () => AppRouter.navigateTo(context, AppRouter.tasks),
+      ),
+      
+      const SizedBox(height: 16),
+      
+      // 🔹 ADMIN SECTION (Admin only)
+      AdminOnly(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 8),
+              child: Text(
+                'ADMIN',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+              childrenPadding: EdgeInsets.zero,
+              initiallyExpanded: _adminExpanded,
+              onExpansionChanged: (v) => setState(() => _adminExpanded = v),
+              shape: const Border(),
+              leading: const Icon(Icons.shield_outlined, size: 20),
+              title: const Text('System', style: TextStyle(fontSize: 14)),
+              children: [
+                _SidebarSubItem(
+                  label: 'Users',
+                  onTap: () => AppRouter.navigateTo(context, AppRouter.adminUsers),
+                ),
+                _SidebarSubItem(
+                  label: 'Roles',
+                  onTap: () => AppRouter.navigateTo(context, AppRouter.adminRoles),
+                ),
+                _SidebarSubItem(
+                  label: 'Domain Mappings',
+                  onTap: () =>
+                      AppRouter.navigateTo(context, AppRouter.adminDomainMappings),
+                ),
+                _SidebarSubItem(
+                  label: 'Activity Logs',
+                  onTap: () =>
+                      AppRouter.navigateTo(context, AppRouter.activityLogs),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
       const Spacer(),
       if (showLogout)
@@ -670,199 +659,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: items,
       ),
-    );
-  }
-
-  Future<void> _showUserDialog(BuildContext ctx, {User? user}) async {
-    final isNew = user == null;
-    final nameCtrl = TextEditingController(text: user?.name ?? '');
-    final emailCtrl = TextEditingController(text: user?.email ?? '');
-    String role = user?.role ?? 'VIEWER';
-    bool isActive = user?.isActive ?? true;
-    bool sendInvite = true;
-    final formKey = GlobalKey<FormState>();
-
-    // Fetch roles
-    List<String> availableRoles = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
-    final rolesRes = await _rolesService.getRoles();
-    if (rolesRes.isSuccess) {
-      availableRoles = rolesRes.value.roles.map((r) => r.name).toList();
-    }
-
-    // Ensure current role is in available roles
-    if (user?.role != null && !availableRoles.contains(user!.role)) {
-      availableRoles.add(user.role!);
-    }
-    // Ensure initial role is in available roles
-    if (!availableRoles.contains(role)) {
-      availableRoles.add(role);
-    }
-
-    if (!ctx.mounted) return;
-
-    await showDialog<void>(
-      context: ctx,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (ctx2, setStateDialog) {
-            return AlertDialog(
-              title: Text(isNew ? 'Create User' : 'Edit User'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: emailCtrl,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        validator: (v) =>
-                            (v == null || v.isEmpty) ? 'Email required' : null,
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Name'),
-                        validator: (v) =>
-                            (v == null || v.isEmpty) ? 'Name required' : null,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: role,
-                        decoration: const InputDecoration(labelText: 'Role'),
-                        items: availableRoles
-                            .map(
-                              (r) => DropdownMenuItem(value: r, child: Text(r)),
-                            )
-                            .toList(),
-                        onChanged: (v) => role = v ?? role,
-                      ),
-                      const SizedBox(height: 8),
-                      SwitchListTile(
-                        title: const Text('Active'),
-                        value: isActive,
-                        onChanged: (v) => setStateDialog(() => isActive = v),
-                      ),
-                      if (isNew)
-                        SwitchListTile(
-                          title: const Text('Send invitation email'),
-                          value: sendInvite,
-                          onChanged: (v) =>
-                              setStateDialog(() => sendInvite = v),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    if (!formKey.currentState!.validate()) return;
-                    final newUser = User(
-                      id: user?.id ?? '',
-                      email: emailCtrl.text.trim(),
-                      name: nameCtrl.text.trim(),
-                      role: role,
-                      isActive: isActive,
-                    );
-                    if (isNew) {
-                      if (sendInvite) {
-                        final orgId =
-                            locator<AuthService>().selectedOrganizationId;
-                        if (orgId == null) return;
-                        final res = await _usersService.inviteUser(
-                          orgId: orgId,
-                          email: newUser.email,
-                          role: newUser.role ?? 'VIEWER',
-                        );
-                        if (res.isSuccess) {
-                          Navigator.of(dialogCtx).pop();
-                          _loadDashboard();
-                        }
-                      } else {
-                        final res = await _usersService.createUser(newUser);
-                        if (res.isSuccess) {
-                          Navigator.of(dialogCtx).pop();
-                          _loadDashboard();
-                        }
-                      }
-                    } else {
-                      final res = await _usersService.updateUser(newUser);
-                      if (res.isSuccess) {
-                        Navigator.of(dialogCtx).pop();
-                        _loadDashboard();
-                      }
-                    }
-                  },
-                  child: Text(
-                    isNew ? (sendInvite ? 'Invite' : 'Create') : 'Save',
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _showRoleDialog(BuildContext ctx, {UserRole? role}) async {
-    final isNew = role == null;
-    final nameCtrl = TextEditingController(text: role?.name ?? '');
-    final descCtrl = TextEditingController(text: role?.description ?? '');
-    // UserRoleType and selected permissions not currently used in this dialog
-    final formKey = GlobalKey<FormState>();
-
-    await showDialog<void>(
-      context: ctx,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (ctx2, setStateDialog) {
-            return AlertDialog(
-              title: Text(isNew ? 'Create Role' : 'Edit Role'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Name'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: descCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                        ),
-                      ),
-                      // ... (Keep existing role logic condensed for brevity)
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    // Mock implementation to preserve flow
-                    Navigator.of(dialogCtx).pop();
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }
@@ -933,9 +729,9 @@ class _DashboardHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     _HeaderMetricChip(
-                      label: 'Orgs',
-                      value: metrics.totalOrganizations.toString(),
-                      icon: Icons.domain,
+                      label: 'Accounts',
+                      value: metrics.totalAccounts.toString(),
+                      icon: Icons.business_outlined,
                     ),
                   ],
                 ),
@@ -1003,139 +799,6 @@ class _HeaderMetricChip extends StatelessWidget {
   }
 }
 
-/// 2. Metric Card
-class _CompactMetricCard extends StatelessWidget {
-  const _CompactMetricCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 100),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        // Hiệu ứng đổ bóng nhẹ
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 24, color: color),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(fontSize: 13, color: Colors.blueGrey[400]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 3. Dashboard Card Wrapper
-class _DashboardCard extends StatelessWidget {
-  const _DashboardCard({
-    required this.title,
-    required this.icon,
-    this.trailing,
-    required this.child,
-    this.accentColor,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget? trailing;
-  final Widget child;
-  final Color? accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = accentColor ?? Theme.of(context).colorScheme.primary;
-
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(height: 4, width: double.infinity, color: accent),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, color: accent, size: 22),
-                    const SizedBox(width: 10),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    const Spacer(),
-                    if (trailing != null) trailing!,
-                  ],
-                ),
-                const SizedBox(height: 16),
-                child,
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Helper sidebar sub-item
 class _SidebarSubItem extends StatelessWidget {
   final String label;
@@ -1190,66 +853,6 @@ class _SidebarItem extends StatelessWidget {
         ),
         onTap: onTap,
       ),
-    );
-  }
-}
-
-class _ActivityTimelineTile extends StatelessWidget {
-  const _ActivityTimelineTile({
-    required this.log,
-    required this.isFirst,
-    required this.isLast,
-    required this.onTap,
-  });
-  final ActivityLog log;
-  final bool isFirst;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: Colors.blue[300],
-                shape: BoxShape.circle,
-              ),
-            ),
-            if (!isLast)
-              Container(width: 2, height: 40, color: Colors.grey[200]),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  log.description.isNotEmpty
-                      ? log.description
-                      : log.activityType.value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  '${log.userName ?? 'System'} • 2 mins ago',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

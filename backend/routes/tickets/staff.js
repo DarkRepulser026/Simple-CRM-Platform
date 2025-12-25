@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
     const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
     const priority = req.query.priority ? String(req.query.priority).toUpperCase() : undefined;
     const ownerId = req.query.ownerId ? String(req.query.ownerId) : undefined;
+    const accountId = req.query.accountId ? String(req.query.accountId) : undefined;
     const search = req.query.search ? String(req.query.search).toLowerCase() : undefined;
 
     const skip = (page - 1) * limit;
@@ -28,6 +29,7 @@ router.get('/', async (req, res) => {
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (ownerId) where.ownerId = ownerId;
+    if (accountId) where.accountId = accountId;
 
     const tickets = await prisma.ticket.findMany({
       where,
@@ -74,13 +76,50 @@ router.get('/', async (req, res) => {
 // POST / - Create ticket
 router.post('/', authorize(['CREATE_TICKETS']), validateTicket, async (req, res) => {
   try {
+    const { subject, description, status, priority, category, accountId, ownerId, slaDeadline } = req.body;
+
+    // Map frontend display values to Prisma enums
+    const statusMap = {
+      'Open': 'OPEN',
+      'In Progress': 'IN_PROGRESS',
+      'Resolved': 'RESOLVED',
+      'Closed': 'CLOSED'
+    };
+
+    const priorityMap = {
+      'Low': 'LOW',
+      'Normal': 'NORMAL',
+      'High': 'HIGH',
+      'Urgent': 'URGENT'
+    };
+
+    // Helper to sanitize inputs (convert empty strings/nulls to undefined)
+    const sanitize = (val) => (val === '' || val === null ? undefined : val);
+
     const ticket = await prisma.ticket.create({
       data: {
-        ...req.body,
+        subject,
+        description: sanitize(description),
+        status: statusMap[status] || (Object.values(statusMap).includes(status) ? status : undefined),
+        priority: priorityMap[priority] || (Object.values(priorityMap).includes(priority) ? priority : undefined),
+        category: sanitize(category),
+        accountId: sanitize(accountId),
+        ownerId: sanitize(ownerId) || req.user.id,
+        slaDeadline: sanitize(slaDeadline) ? new Date(sanitize(slaDeadline)) : undefined,
         organizationId: req.organizationId,
-        ownerId: req.body.ownerId || req.user.id
+        createdById: req.user.id
       }
     });
+
+    await createActivityLogEntry({
+      action: 'TICKET_CREATED',
+      entityType: 'Ticket',
+      entityId: ticket.id,
+      description: `Ticket ${ticket.subject} created by ${req.user.email}`,
+      userId: req.user.id,
+      organizationId: req.organizationId
+    });
+
     res.status(201).json(ticket);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -109,6 +148,64 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
     res.json(ticket);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET /:id/activities - Get ticket activity log
+router.get('/:id/activities', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const _page = Math.max(parseInt(page), 1);
+    const _limit = Math.min(parseInt(limit), 100);
+    const skip = (_page - 1) * _limit;
+
+    // Verify ticket exists
+    const ticket = await prisma.ticket.findFirst({
+      where: {
+        id: req.params.id,
+        organizationId: req.organizationId
+      }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const total = await prisma.activityLog.count({
+      where: {
+        entityType: 'Ticket',
+        entityId: req.params.id,
+        organizationId: req.organizationId
+      }
+    });
+
+    const activities = await prisma.activityLog.findMany({
+      where: {
+        entityType: 'Ticket',
+        entityId: req.params.id,
+        organizationId: req.organizationId
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: _limit
+    });
+
+    res.json({
+      activities,
+      pagination: {
+        page: _page,
+        limit: _limit,
+        total,
+        totalPages: Math.ceil(total / _limit),
+        hasNext: _page * _limit < total,
+        hasPrev: _page > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -291,15 +388,26 @@ router.post('/:id/satisfaction', async (req, res) => {
 // DELETE /:id - Delete ticket
 router.delete('/:id', authorize(['DELETE_TICKETS']), async (req, res) => {
   try {
-    const ticket = await prisma.ticket.deleteMany({
-      where: {
-        id: req.params.id,
-        organizationId: req.organizationId
-      }
+    const existing = await prisma.ticket.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId }
     });
-    if (ticket.count === 0) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
+
+    if (!existing) return res.status(404).json({ message: 'Ticket not found' });
+
+    await prisma.ticket.delete({
+      where: { id: req.params.id }
+    });
+
+    await createActivityLogEntry({
+      action: 'TICKET_DELETED',
+      entityType: 'Ticket',
+      entityId: req.params.id,
+      description: `Ticket ${existing.subject} deleted by ${req.user.email}`,
+      userId: req.user.id,
+      organizationId: req.organizationId,
+      metadata: { ticket: existing }
+    });
+
     res.json({ message: 'Ticket deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

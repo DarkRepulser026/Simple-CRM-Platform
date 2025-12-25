@@ -30,9 +30,6 @@ void main() {
   testWidgets('AuthWrapper shows loading then completes initialization', (
     final WidgetTester tester,
   ) async {
-    // Create mock auth service
-    final mockAuthService = MockAuthService();
-
     // Build AuthWrapper with mocked service
     await tester.pumpWidget(
       MaterialApp(

@@ -3,8 +3,10 @@ import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/contacts_service.dart';
+import '../../services/accounts_service.dart';
 import '../../services/users_service.dart';
 import '../../models/user.dart';
+import '../../models/account.dart';
 import '../../widgets/error_view.dart';
 
 /// === Public API =============================================================
@@ -59,6 +61,7 @@ class _ContactCreateDialog extends StatefulWidget {
 
 class _ContactCreateDialogState extends State<_ContactCreateDialog> {
   late final ContactsService _contactsService;
+  late final AccountsService _accountsService;
   late final UsersService _usersService;
 
   final _formKey = GlobalKey<FormState>();
@@ -69,7 +72,9 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
   // company field removed for now - not used
   final _titleCtrl = TextEditingController();
   String? _selectedOwnerId;
+  String? _selectedAccountId;
   List<User>? _users;
+  List<Account>? _accounts;
 
   bool _isLoading = false;
   String? _error;
@@ -78,8 +83,9 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
   void initState() {
     super.initState();
     _contactsService = locator<ContactsService>();
+    _accountsService = locator<AccountsService>();
     _usersService = locator<UsersService>();
-    _loadUsers();
+    _loadData();
     debugPrint('ContactCreateDialog opened');
   }
 
@@ -93,9 +99,12 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
     super.dispose();
   }
 
-  Future<void> _loadUsers() async {
-    final res = await _usersService.getUsers(limit: 200);
-    if (res.isSuccess) setState(() => _users = res.value.users);
+  Future<void> _loadData() async {
+    final usersRes = await _usersService.getUsers(limit: 200);
+    if (usersRes.isSuccess) setState(() => _users = usersRes.value.users);
+
+    final accountsRes = await _accountsService.getAccounts(limit: 1000);
+    if (accountsRes.isSuccess) setState(() => _accounts = accountsRes.value.accounts);
   }
 
   Future<void> _createContact() async {
@@ -117,7 +126,7 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
       updatedAt: DateTime.now(),
       organizationId: locator<AuthService>().selectedOrganizationId ?? '',
       ownerId: _selectedOwnerId,
-      // TODO: Add email/phone... here once supported by the model.
+      accountId: _selectedAccountId,
     );
 
     final res = await _contactsService.createContact(contact);
@@ -240,6 +249,20 @@ class _ContactCreateDialogState extends State<_ContactCreateDialog> {
                         const SizedBox(width: 12),
                         Expanded(child: TextFormField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Title (optional)'))),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: _selectedAccountId,
+                      decoration: const InputDecoration(
+                        labelText: 'Account (Required)',
+                        prefixIcon: Icon(Icons.business),
+                      ),
+                      items: (_accounts ?? []).map((a) => DropdownMenuItem<String?>(
+                        value: a.id,
+                        child: Text(a.name),
+                      )).toList(),
+                      validator: (v) => (v == null) ? 'Please select an account' : null,
+                      onChanged: (v) => setState(() => _selectedAccountId = v),
                     ),
                     const SizedBox(height: 12),
                     Row(children: [

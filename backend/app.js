@@ -92,6 +92,10 @@ app.use(cors(corsOptions));
 
 // Request logging
 app.use((req, res, next) => {
+  // Skip logging for health checks to reduce noise in tests
+  if (req.path === '/health' || req.path === '/api/health') {
+    return next();
+  }
   console.log(`Incoming request: ${req.method} ${req.path} Origin:${req.headers.origin || 'none'}`);
   next();
 });

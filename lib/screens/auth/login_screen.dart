@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildQuickLoginButton(String label, String email, Color color) {
     return FilledButton.tonal(
-      onPressed: _isLoading ? null : () => _quickLogin(email, 'test123'),
+      onPressed: _isLoading ? null : () => _quickLogin(email, 'password123'),
       style: FilledButton.styleFrom(
         backgroundColor: color.withOpacity(0.1),
         foregroundColor: color,
@@ -117,19 +117,99 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showDebugMenu() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bug_report, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            const Text('Debug Quick Login'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Development Mode Only',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildQuickLoginButton('Admin', 'admin@example.com', Colors.red),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Manager', 'manager@example.com', Colors.orange),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Agent', 'agent@example.com', Colors.blue),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Viewer', 'viewer@example.com', Colors.green),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Sử dụng LayoutBuilder để responsive
     return Scaffold(
       backgroundColor: Colors.white,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 900) {
-            return _buildDesktopLayout();
-          } else {
-            return _buildMobileLayout();
-          }
-        },
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 900) {
+                return _buildDesktopLayout();
+              } else {
+                return _buildMobileLayout();
+              }
+            },
+          ),
+          // Debug menu button (only in debug mode)
+          if (kDebugMode)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _showDebugMenu,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.orange[700],
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.bug_report,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -441,34 +521,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 32),
 
-        // Debug Quick Login (only in development)
-        if (kDebugMode)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '🔧 Debug: Quick Login',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildQuickLoginButton('Admin', 'admin@example.com', Colors.red),
-                  _buildQuickLoginButton('Manager', 'manager@example.com', Colors.orange),
-                  _buildQuickLoginButton('Agent', 'agent@example.com', Colors.blue),
-                  _buildQuickLoginButton('Viewer', 'user@example.com', Colors.green),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-
         // Footer / Terms
         Column(
           children: [
@@ -504,50 +556,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         
         const SizedBox(height: 24),
-        
-        // Customer Portal Link
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.shade200),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.support_agent, size: 18, color: _accentColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Looking for customer support?',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  AppRouter.navigateTo(context, AppRouter.customerLogin);
-                },
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('Customer Portal'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _accentColor,
-                  side: BorderSide(color: _accentColor),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }

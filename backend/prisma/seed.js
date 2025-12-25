@@ -1,1 +1,1 @@
-import '../scripts/seed-v2.js';
+import '../scripts/seed-production.js';

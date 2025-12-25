@@ -3,6 +3,7 @@ import '../../models/task.dart';
 import '../../services/service_locator.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/tasks_service.dart';
+import '../../widgets/owner_dropdown.dart';
 
 /// Màn tạo task dạng "popup card" ở giữa (dùng khi điều hướng bằng route)
 class TaskCreateScreen extends StatelessWidget {
@@ -57,9 +58,7 @@ Future<bool?> showTaskCreateDialog(BuildContext context) {
     barrierDismissible: false,
     builder: (ctx) {
       return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         insetPadding: const EdgeInsets.all(16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -87,12 +86,13 @@ class _TaskForm extends StatefulWidget {
 class _TaskFormState extends State<_TaskForm> {
   late final TasksService _tasksService;
   final _formKey = GlobalKey<FormState>();
-  
+
   final _subjectCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
-  
+
   TaskPriority _priority = TaskPriority.normal;
   DateTime? _dueDate;
+  String? _ownerId;
 
   bool _isLoading = false;
   String? _error;
@@ -115,7 +115,9 @@ class _TaskFormState extends State<_TaskForm> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _dueDate ?? now,
-      firstDate: now.subtract(const Duration(days: 365)), // Cho phép chọn quá khứ nếu cần
+      firstDate: now.subtract(
+        const Duration(days: 365),
+      ), // Cho phép chọn quá khứ nếu cần
       lastDate: now.add(const Duration(days: 365 * 2)),
     );
     if (picked != null) {
@@ -143,10 +145,11 @@ class _TaskFormState extends State<_TaskForm> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       dueDate: _dueDate,
+      ownerId: _ownerId,
     );
 
     final res = await _tasksService.createTask(task);
-    
+
     if (!mounted) return;
 
     if (res.isSuccess) {
@@ -197,12 +200,19 @@ class _TaskFormState extends State<_TaskForm> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: cs.onErrorContainer, size: 20),
+                  Icon(
+                    Icons.error_outline,
+                    color: cs.onErrorContainer,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _error!,
-                      style: TextStyle(color: cs.onErrorContainer, fontSize: 13),
+                      style: TextStyle(
+                        color: cs.onErrorContainer,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
@@ -222,7 +232,10 @@ class _TaskFormState extends State<_TaskForm> {
                   decoration: InputDecoration(
                     labelText: 'Subject *',
                     hintText: 'e.g. Review Q3 Reports',
-                    prefixIcon: Icon(Icons.task_alt_outlined, color: cs.primary),
+                    prefixIcon: Icon(
+                      Icons.task_alt_outlined,
+                      color: cs.primary,
+                    ),
                     filled: true,
                     fillColor: cs.surfaceVariant.withOpacity(0.3),
                     border: OutlineInputBorder(
@@ -231,13 +244,18 @@ class _TaskFormState extends State<_TaskForm> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: cs.outline.withOpacity(0.1),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: cs.primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'Subject is required'
@@ -254,7 +272,10 @@ class _TaskFormState extends State<_TaskForm> {
                     hintText: 'Add details here...',
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Icon(Icons.description_outlined, color: cs.onSurfaceVariant),
+                      child: Icon(
+                        Icons.description_outlined,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     filled: true,
                     fillColor: cs.surfaceVariant.withOpacity(0.3),
@@ -264,14 +285,19 @@ class _TaskFormState extends State<_TaskForm> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                      borderSide: BorderSide(
+                        color: cs.outline.withOpacity(0.1),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: cs.primary, width: 2),
                     ),
                     alignLabelWithHint: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                   ),
                   maxLines: 3,
                   minLines: 2,
@@ -288,7 +314,10 @@ class _TaskFormState extends State<_TaskForm> {
                         value: _priority,
                         decoration: InputDecoration(
                           labelText: 'Priority',
-                          prefixIcon: Icon(Icons.flag_outlined, color: cs.primary),
+                          prefixIcon: Icon(
+                            Icons.flag_outlined,
+                            color: cs.primary,
+                          ),
                           filled: true,
                           fillColor: cs.surfaceVariant.withOpacity(0.3),
                           border: OutlineInputBorder(
@@ -297,19 +326,27 @@ class _TaskFormState extends State<_TaskForm> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                            borderSide: BorderSide(
+                              color: cs.outline.withOpacity(0.1),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(color: cs.primary, width: 2),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                         ),
                         items: TaskPriority.values.map((p) {
                           final pColor = _getPriorityColor(p, cs);
                           return DropdownMenuItem(
                             value: p,
-                            child: Text(p.value, style: TextStyle(color: pColor)),
+                            child: Text(
+                              p.value,
+                              style: TextStyle(color: pColor),
+                            ),
                           );
                         }).toList(),
                         onChanged: (v) {
@@ -318,7 +355,6 @@ class _TaskFormState extends State<_TaskForm> {
                       ),
                     ),
                     const SizedBox(width: 12),
-
                     // Due Date Picker
                     Expanded(
                       flex: 1,
@@ -328,14 +364,10 @@ class _TaskFormState extends State<_TaskForm> {
                         child: InputDecorator(
                           decoration: InputDecoration(
                             labelText: 'Due Date',
-                            prefixIcon: Icon(Icons.calendar_today, color: cs.primary),
-                            suffixIcon: _dueDate != null
-                                ? IconButton(
-                                    onPressed: () => setState(() => _dueDate = null),
-                                    icon: Icon(Icons.clear, size: 18, color: cs.onSurfaceVariant),
-                                    padding: EdgeInsets.zero,
-                                  )
-                                : null,
+                            prefixIcon: Icon(
+                              Icons.event_outlined,
+                              color: cs.primary,
+                            ),
                             filled: true,
                             fillColor: cs.surfaceVariant.withOpacity(0.3),
                             border: OutlineInputBorder(
@@ -344,9 +376,14 @@ class _TaskFormState extends State<_TaskForm> {
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                              borderSide: BorderSide(
+                                color: cs.outline.withOpacity(0.1),
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 14,
+                            ),
                           ),
                           child: Text(
                             _dueDate == null
@@ -354,14 +391,26 @@ class _TaskFormState extends State<_TaskForm> {
                                 : '${_dueDate!.day}/${_dueDate!.month}/${_dueDate!.year}',
                             style: TextStyle(
                               color: _dueDate == null
-                                  ? cs.onSurfaceVariant
+                                  ? cs.onSurfaceVariant.withOpacity(0.5)
                                   : cs.onSurface,
+                              fontSize: 14,
                             ),
                           ),
                         ),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+
+                // Assign To (Owner Dropdown)
+                OwnerDropdown(
+                  entityType: 'task',
+                  onChanged: (ownerId) {
+                    setState(() => _ownerId = ownerId);
+                  },
+                  label: 'Assign To',
+                  hintText: 'Select a manager or agent',
                 ),
               ],
             ),

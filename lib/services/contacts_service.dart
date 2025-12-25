@@ -207,4 +207,127 @@ class ContactsService {
 
     return headers;
   }
+
+  /// Batch get multiple contacts by IDs
+  Future<Result<List<Contact>, ApiError>> getContactsByIds(List<String> contactIds) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    if (contactIds.isEmpty) {
+      return Result.success([]);
+    }
+
+    final contacts = <Contact>[];
+    for (final contactId in contactIds) {
+      final res = await getContact(contactId);
+      if (res.isSuccess) {
+        contacts.add(res.value);
+      }
+    }
+    return Result.success(contacts);
+  }
+
+  /// Get contacts by account ID
+  Future<Result<List<Contact>, ApiError>> getContactsByAccountId(String accountId) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    final result = await getContacts(limit: 1000);
+    if (result.isError) return Result.error(result.error);
+
+    final filtered = result.value.contacts.where((c) => c.accountId == accountId).toList();
+    return Result.success(filtered);
+  }
+
+  /// Get contacts by owner ID
+  Future<Result<List<Contact>, ApiError>> getContactsByOwnerId(String ownerId) async {
+    return getContacts(
+      limit: 1000,
+      ownerId: ownerId,
+    ).then((result) {
+      if (result.isError) return Result.error(result.error);
+      return Result.success(result.value.contacts);
+    });
+  }
+
+  /// Get contacts by city
+  Future<Result<List<Contact>, ApiError>> getContactsByCity(String city) async {
+    return getContacts(
+      limit: 1000,
+      city: city,
+    ).then((result) {
+      if (result.isError) return Result.error(result.error);
+      return Result.success(result.value.contacts);
+    });
+  }
+
+  /// Get contacts by department
+  Future<Result<List<Contact>, ApiError>> getContactsByDepartment(String department) async {
+    return getContacts(
+      limit: 1000,
+      department: department,
+    ).then((result) {
+      if (result.isError) return Result.error(result.error);
+      return Result.success(result.value.contacts);
+    });
+  }
+
+  /// Get all contacts for an account with optional filtering
+  Future<Result<List<Contact>, ApiError>> getAccountContacts(
+    String accountId, {
+    String? search,
+    String? ownerId,
+  }) async {
+    final result = await getContacts(
+      limit: 1000,
+      search: search,
+      ownerId: ownerId,
+    );
+
+    if (result.isError) return Result.error(result.error);
+
+    final filtered = result.value.contacts.where((c) => c.accountId == accountId).toList();
+    return Result.success(filtered);
+  }
+
+  /// Get contacts activity log
+  Future<Result<List<Map<String, dynamic>>, ApiError>> getContactActivityLog({
+    required String contactId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    final url = '${ApiConfig.contacts}/$contactId/activities';
+    final uri = Uri.parse(url).replace(queryParameters: queryParams);
+
+    final result = await _apiClient.get<Map<String, dynamic>>(
+      uri.toString(),
+      headers: await _getAuthHeaders(),
+      fromJson: (json) => json,
+    );
+
+    if (result.isError) {
+      return Result.error(result.error);
+    }
+
+    try {
+      final activities = (result.value['activities'] as List<dynamic>?)
+              ?.map((a) => a as Map<String, dynamic>)
+              .toList() ??
+          [];
+      return Result.success(activities);
+    } catch (e) {
+      return Result.error(ApiError.parsing('Failed to parse activities: $e'));
+    }
+  }
 }

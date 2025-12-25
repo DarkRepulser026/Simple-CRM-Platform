@@ -33,9 +33,6 @@ async function main() {
     console.log('Deleting accounts...');
     await prisma.account.deleteMany({});
 
-    console.log('Deleting customer profiles...');
-    await prisma.customerProfile.deleteMany({});
-
     console.log('Deleting activity logs...');
     await prisma.activityLog.deleteMany({});
 

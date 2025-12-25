@@ -94,4 +94,77 @@ class AccountsService {
     if (orgId != null) headers['X-Organization-ID'] = orgId;
     return headers;
   }
+
+  /// Batch get multiple accounts by IDs
+  Future<Result<List<Account>, ApiError>> getAccountsByIds(List<String> accountIds) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    if (accountIds.isEmpty) {
+      return Result.success([]);
+    }
+
+    final accounts = <Account>[];
+    for (final accountId in accountIds) {
+      final res = await getAccount(accountId);
+      if (res.isSuccess) {
+        accounts.add(res.value);
+      }
+    }
+    return Result.success(accounts);
+  }
+
+  /// Search accounts
+  Future<Result<List<Account>, ApiError>> searchAccounts(
+    String query, {
+    int limit = 100,
+  }) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    final result = await getAccounts(limit: limit, search: query);
+    if (result.isError) return Result.error(result.error);
+    return Result.success(result.value.accounts);
+  }
+
+  /// Get account activity log
+  Future<Result<List<Map<String, dynamic>>, ApiError>> getAccountActivityLog({
+    required String accountId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    final url = '${ApiConfig.accounts}/$accountId/activities';
+    final uri = Uri.parse(url).replace(queryParameters: queryParams);
+
+    final result = await _apiClient.get<Map<String, dynamic>>(
+      uri.toString(),
+      headers: await _getAuthHeaders(),
+      fromJson: (json) => json,
+    );
+
+    if (result.isError) {
+      return Result.error(result.error);
+    }
+
+    try {
+      final activities = (result.value['activities'] as List<dynamic>?)
+              ?.map((a) => a as Map<String, dynamic>)
+              .toList() ??
+          [];
+      return Result.success(activities);
+    } catch (e) {
+      return Result.error(ApiError.parsing('Failed to parse activities: $e'));
+    }
+  }
 }

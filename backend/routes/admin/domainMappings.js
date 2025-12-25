@@ -18,7 +18,6 @@ router.get('/', authorizeGlobalAdmin(['MANAGE_USERS']), async (req, res) => {
         },
       },
       orderBy: [
-        { priority: 'desc' },
         { domain: 'asc' },
       ],
     });
@@ -31,10 +30,10 @@ router.get('/', authorizeGlobalAdmin(['MANAGE_USERS']), async (req, res) => {
         domain: m.domain,
         organizationId: m.organizationId,
         organizationName: m.organization.name,
-        isActive: m.isActive,
-        autoAssign: m.autoAssign,
-        priority: m.priority,
+        verified: m.verified,
+        accountId: m.accountId,
         createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
       })),
     });
   } catch (error) {

@@ -235,7 +235,7 @@ class ApiClient {
 
           final jsonData = jsonDecode(response.body);
           if (fromJson != null) {
-            return Result.success(fromJson(jsonData));
+            return Result.success(fromJson(jsonData as Map<String, dynamic>));
           } else if (jsonData is Map<String, dynamic>) {
             return Result.success(jsonData as T);
           } else {

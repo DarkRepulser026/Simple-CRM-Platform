@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import '../../models/ticket.dart';
 import '../../services/service_locator.dart';
 import '../../services/tickets_service.dart';
+import '../../services/auth/auth_service.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/activity_log_widget.dart';
+import '../../widgets/owner_dropdown.dart';
 
 // Argument class để truyền ID khi navigate
 class TicketDetailArgs {
@@ -41,9 +44,12 @@ class TicketDetailScreen extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: _TicketDetailCard(ticketId: ticketId, onChanged: () {
-                    // Reload on edit
-                  }),
+                  child: _TicketDetailCard(
+                    ticketId: ticketId,
+                    onChanged: () {
+                      // Reload on edit
+                    },
+                  ),
                 ),
               ),
             ),
@@ -55,7 +61,10 @@ class TicketDetailScreen extends StatelessWidget {
 }
 
 /// Pop-up dialog dùng trong TicketsListScreen
-Future<bool?> showTicketDetailDialog(BuildContext context, {required String ticketId}) {
+Future<bool?> showTicketDetailDialog(
+  BuildContext context, {
+  required String ticketId,
+}) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: true,
@@ -121,6 +130,68 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
     }
   }
 
+  Future<void> _showReassignDialog() async {
+    if (_ticket == null) return;
+
+    String? newOwnerId = _ticket!.ownerId;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reassign Ticket'),
+              content: SizedBox(
+                width: 400,
+                child: OwnerDropdown(
+                  initialOwnerId: _ticket!.ownerId,
+                  entityType: 'ticket',
+                  onChanged: (value) => newOwnerId = value,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Reassign'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true &&
+        newOwnerId != null &&
+        newOwnerId!.isNotEmpty &&
+        mounted) {
+      await _reassignTicket(newOwnerId!);
+    }
+  }
+
+  Future<void> _reassignTicket(String newOwnerId) async {
+    final result = await _ticketsService.assignTicket(_ticket!.id, newOwnerId);
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ticket reassigned successfully')),
+      );
+      widget.onChanged?.call();
+      _load(); // Reload ticket data
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to reassign: ${result.error.message}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -130,7 +201,9 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
       return const Center(child: LoadingView(message: 'Loading ticket...'));
     }
     if (_error != null) {
-      return Center(child: ErrorView(message: _error!, onRetry: _load));
+      return Center(
+        child: ErrorView(message: _error!, onRetry: _load),
+      );
     }
     if (_ticket == null) {
       return const Center(child: Text('No ticket data'));
@@ -140,176 +213,232 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
     final (statusBg, statusFg, statusIcon) = _getStatusStyle(ticket.status, cs);
     final priorityColor = _getPriorityColor(ticket.priority, cs);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    ticket.subject,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TabBar(
+            tabs: const [
+              Tab(text: 'Details'),
+              Tab(text: 'Activity Log'),
+            ],
+            labelColor: cs.primary,
+            unselectedLabelColor: cs.onSurfaceVariant,
+            indicatorColor: cs.primary,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 500,
+            child: TabBarView(
+              children: [
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  ticket.subject,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '#${ticket.id.substring(0, 8).toUpperCase()}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 14, color: statusFg),
+                                const SizedBox(width: 4),
+                                Text(
+                                  ticket.status.value,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusFg,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      const Divider(height: 1),
+                      const SizedBox(height: 24),
+
+                      // Details Section
+                      Text(
+                        'DETAILS',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Priority
+                      _buildDetailRow(
+                        context,
+                        label: 'Priority',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: priorityColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            ticket.priority.value,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: priorityColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Category
+                      if (ticket.category != null &&
+                          ticket.category!.isNotEmpty)
+                        _buildDetailRow(
+                          context,
+                          label: 'Category',
+                          child: Text(ticket.category!),
+                        ),
+                      if (ticket.category != null &&
+                          ticket.category!.isNotEmpty)
+                        const SizedBox(height: 12),
+
+                      // Owner with Reassign Button
+                      _buildDetailRow(
+                        context,
+                        label: 'Assigned To',
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                ticket.ownerName ?? 'Unassigned',
+                                style: TextStyle(
+                                  color: ticket.ownerName == null
+                                      ? cs.onSurfaceVariant.withOpacity(0.6)
+                                      : null,
+                                  fontStyle: ticket.ownerName == null
+                                      ? FontStyle.italic
+                                      : null,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildReassignButton(context, cs),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Created Date
+                      _buildDetailRow(
+                        context,
+                        label: 'Created',
+                        child: Text(ticket.createdAt.toString().split('.')[0]),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Updated Date
+                      _buildDetailRow(
+                        context,
+                        label: 'Last Updated',
+                        child: Text(ticket.updatedAt.toString().split('.')[0]),
+                      ),
+
+                      if (ticket.description != null &&
+                          ticket.description!.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        const Divider(height: 1),
+                        const SizedBox(height: 24),
+                        Text(
+                          'DESCRIPTION',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceVariant.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            ticket.description!,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+                      const Divider(height: 1),
+                      const SizedBox(height: 24),
+
+                      // Edit Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Edit Ticket'),
+                          onPressed: () => _showEditDialog(context),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '#${ticket.id.substring(0, 8).toUpperCase()}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusBg,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(statusIcon, size: 14, color: statusFg),
-                  const SizedBox(width: 4),
-                  Text(
-                    ticket.status.value,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: statusFg,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Divider(height: 1),
-        const SizedBox(height: 24),
-
-        // Details Section
-        Text(
-          'DETAILS',
-          style: theme.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: cs.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Priority
-        _buildDetailRow(
-          context,
-          label: 'Priority',
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: priorityColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              ticket.priority.value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: priorityColor,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Category
-        if (ticket.category != null && ticket.category!.isNotEmpty)
-          _buildDetailRow(
-            context,
-            label: 'Category',
-            child: Text(ticket.category!),
-          ),
-        if (ticket.category != null && ticket.category!.isNotEmpty)
-          const SizedBox(height: 12),
-
-        // Owner
-        if (ticket.ownerName != null && ticket.ownerName!.isNotEmpty)
-          _buildDetailRow(
-            context,
-            label: 'Assigned To',
-            child: Text(ticket.ownerName!),
-          ),
-        if (ticket.ownerName != null && ticket.ownerName!.isNotEmpty)
-          const SizedBox(height: 12),
-
-        // Created Date
-        _buildDetailRow(
-          context,
-          label: 'Created',
-          child: Text(
-            ticket.createdAt.toString().split('.')[0],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Updated Date
-        _buildDetailRow(
-          context,
-          label: 'Last Updated',
-          child: Text(
-            ticket.updatedAt.toString().split('.')[0],
-          ),
-        ),
-
-        if (ticket.description != null && ticket.description!.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 24),
-          Text(
-            'DESCRIPTION',
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: cs.surfaceVariant.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              ticket.description!,
-              style: theme.textTheme.bodyMedium,
+                ),
+                ActivityLogWidget(
+                  entityId: widget.ticketId,
+                  entityType: 'Ticket',
+                ),
+              ],
             ),
           ),
         ],
-        
-        const SizedBox(height: 24),
-        const Divider(height: 1),
-        const SizedBox(height: 24),
-        
-        // Edit Button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.edit),
-            label: const Text('Edit Ticket'),
-            onPressed: () => _showEditDialog(context),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, {required String label, required Widget child}) {
+  Widget _buildDetailRow(
+    BuildContext context, {
+    required String label,
+    required Widget child,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
@@ -317,9 +446,9 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
           width: 100,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ),
         const SizedBox(width: 16),
@@ -328,14 +457,29 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
     );
   }
 
-  (Color, Color, IconData) _getStatusStyle(TicketStatus status, ColorScheme cs) {
+  (Color, Color, IconData) _getStatusStyle(
+    TicketStatus status,
+    ColorScheme cs,
+  ) {
     switch (status) {
       case TicketStatus.open:
-        return (Colors.green.withOpacity(0.1), Colors.green[700]!, Icons.circle);
+        return (
+          Colors.green.withOpacity(0.1),
+          Colors.green[700]!,
+          Icons.circle,
+        );
       case TicketStatus.inProgress:
-        return (Colors.blue.withOpacity(0.1), Colors.blue[700]!, Icons.autorenew);
+        return (
+          Colors.blue.withOpacity(0.1),
+          Colors.blue[700]!,
+          Icons.autorenew,
+        );
       case TicketStatus.resolved:
-        return (Colors.cyan.withOpacity(0.1), Colors.cyan[700]!, Icons.check_circle);
+        return (
+          Colors.cyan.withOpacity(0.1),
+          Colors.cyan[700]!,
+          Icons.check_circle,
+        );
       case TicketStatus.closed:
         return (Colors.grey.withOpacity(0.15), Colors.grey[700]!, Icons.lock);
     }
@@ -353,11 +497,34 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
     }
   }
 
+  Widget _buildReassignButton(BuildContext context, ColorScheme cs) {
+    final authService = locator<AuthService>();
+    final userRole = authService.currentUser?.role;
+
+    // Only MANAGER and ADMIN can reassign
+    final canReassign = userRole == 'MANAGER' || userRole == 'ADMIN';
+
+    if (!canReassign) return const SizedBox.shrink();
+
+    return OutlinedButton.icon(
+      onPressed: _showReassignDialog,
+      icon: const Icon(Icons.person_add, size: 16),
+      label: const Text('Reassign'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
   void _showEditDialog(BuildContext context) {
     if (_ticket == null) return;
-    
+
     final subjectCtrl = TextEditingController(text: _ticket!.subject);
-    final descriptionCtrl = TextEditingController(text: _ticket!.description ?? '');
+    final descriptionCtrl = TextEditingController(
+      text: _ticket!.description ?? '',
+    );
     final categoryCtrl = TextEditingController(text: _ticket!.category ?? '');
     String? selectedStatus = _ticket!.status.name;
     String? selectedPriority = _ticket!.priority.name;
@@ -384,7 +551,7 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Subject
                     TextField(
                       controller: subjectCtrl,
@@ -394,7 +561,7 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Description
                     TextField(
                       controller: descriptionCtrl,
@@ -405,7 +572,7 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                       maxLines: 4,
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Category
                     TextField(
                       controller: categoryCtrl,
@@ -415,7 +582,7 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Status Dropdown
                     DropdownButtonFormField<String>(
                       value: selectedStatus,
@@ -424,15 +591,17 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                         border: OutlineInputBorder(),
                       ),
                       items: TicketStatus.values
-                          .map((e) => DropdownMenuItem(
-                            value: e.name,
-                            child: Text(e.value),
-                          ))
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.name,
+                              child: Text(e.value),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) => setState(() => selectedStatus = val),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Priority Dropdown
                     DropdownButtonFormField<String>(
                       value: selectedPriority,
@@ -441,15 +610,18 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
                         border: OutlineInputBorder(),
                       ),
                       items: TicketPriority.values
-                          .map((e) => DropdownMenuItem(
-                            value: e.name,
-                            child: Text(e.value),
-                          ))
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.name,
+                              child: Text(e.value),
+                            ),
+                          )
                           .toList(),
-                      onChanged: (val) => setState(() => selectedPriority = val),
+                      onChanged: (val) =>
+                          setState(() => selectedPriority = val),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -499,8 +671,11 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
         if (priority != null) 'priority': priority.toUpperCase(),
       };
 
-      final res = await _ticketsService.updateTicket(widget.ticketId, updateData);
-      
+      final res = await _ticketsService.updateTicket(
+        widget.ticketId,
+        updateData,
+      );
+
       if (res.isSuccess) {
         if (mounted) {
           Navigator.pop(dialogCtx);
@@ -521,9 +696,9 @@ class _TicketDetailCardState extends State<_TicketDetailCard> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(dialogCtx).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          dialogCtx,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }

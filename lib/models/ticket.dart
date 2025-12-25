@@ -65,9 +65,14 @@ class Ticket {
   final TicketStatus status;
   final TicketPriority priority;
   final String? category;
+  final String? accountId;
+  final String? contactId;
   final String? ownerId;
   final String? ownerName;
   final String? ownerEmail;
+  final String? createdById;
+  final String? createdByName;
+  final String? createdByEmail;
   final String organizationId;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -79,9 +84,14 @@ class Ticket {
     required this.status,
     required this.priority,
     this.category,
+    this.accountId,
+    this.contactId,
     this.ownerId,
     this.ownerName,
     this.ownerEmail,
+    this.createdById,
+    this.createdByName,
+    this.createdByEmail,
     required this.organizationId,
     required this.createdAt,
     required this.updatedAt,
@@ -99,9 +109,14 @@ class Ticket {
       status: TicketStatus.fromString(json['status'] ?? 'OPEN'),
       priority: TicketPriority.fromString(json['priority'] ?? 'NORMAL'),
       category: json['category'],
+      accountId: json['accountId'],
+      contactId: json['contactId'],
       ownerId: json['ownerId'],
       ownerName: json['owner'] != null ? json['owner']['name'] : null,
       ownerEmail: json['owner'] != null ? json['owner']['email'] : null,
+      createdById: json['createdById'],
+      createdByName: json['createdBy'] != null ? json['createdBy']['name'] : null,
+      createdByEmail: json['createdBy'] != null ? json['createdBy']['email'] : null,
       organizationId: json['organizationId'] ?? '',
       createdAt: DateTime.parse(
         json['createdAt'] ?? DateTime.now().toIso8601String(),
@@ -136,9 +151,14 @@ class Ticket {
     TicketStatus? status,
     TicketPriority? priority,
     String? category,
+    String? accountId,
+    String? contactId,
     String? ownerId,
     String? ownerName,
     String? ownerEmail,
+    String? createdById,
+    String? createdByName,
+    String? createdByEmail,
     String? organizationId,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -150,9 +170,14 @@ class Ticket {
       status: status ?? this.status,
       priority: priority ?? this.priority,
       category: category ?? this.category,
+      accountId: accountId ?? this.accountId,
+      contactId: contactId ?? this.contactId,
       ownerId: ownerId ?? this.ownerId,
       ownerName: ownerName ?? this.ownerName,
       ownerEmail: ownerEmail ?? this.ownerEmail,
+      createdById: createdById ?? this.createdById,
+      createdByName: createdByName ?? this.createdByName,
+      createdByEmail: createdByEmail ?? this.createdByEmail,
       organizationId: organizationId ?? this.organizationId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

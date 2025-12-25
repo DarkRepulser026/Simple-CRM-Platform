@@ -239,6 +239,49 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     );
   }
 
+  Future<void> _handleDelete() async {
+    if (_role == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete role'),
+        content: Text(
+            'Are you sure you want to delete the role "${_role!.name}"? Users assigned this role may be affected.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final res = await _rolesService.deleteRole(_role!.id);
+      if (res.isSuccess) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Go back to list
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Role deleted successfully')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Failed to delete role: ${res.error.message}')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -246,6 +289,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     final isAdmin = myOrgRole == 'ADMIN';
     final isDefaultRole = _role?.isDefault ?? false;
     final allowEdit = isAdmin && !isDefaultRole;
+    final allowDelete = isAdmin && !isDefaultRole;
 
     return AdminOnly(
       fallback: const AccessDeniedRedirectScreen(),
@@ -260,6 +304,11 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
               IconButton(
                 icon: const Icon(Icons.edit),
                 onPressed: _showEditRoleDialog,
+              ),
+            if (allowDelete && _role != null)
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: _handleDelete,
               ),
           ],
         ),
@@ -491,6 +540,12 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
 
   Map<String, List<Permission>> _groupPermissionsByCategory(List<Permission> permissions) {
     const categories = {
+      'Accounts': [
+        Permission.viewAccounts,
+        Permission.createAccounts,
+        Permission.editAccounts,
+        Permission.deleteAccounts,
+      ],
       'Contacts': [
         Permission.viewContacts,
         Permission.createContacts,

@@ -85,6 +85,34 @@ class UsersService {
     return ok ? Result.success(null) : Result.error(ApiError.unknown('Failed to start impersonation'));
   }
 
+  /// Get users that can be assigned to tickets (Agents only)
+  Future<Result<List<User>, ApiError>> getTicketAssignableUsers() async {
+    if (!_authService.isAuthenticated) return Result.error(ApiError.unauthorized());
+    final url = '${ApiConfig.users}/assignable?type=ticket';
+    final result = await _apiClient.get<Map<String, dynamic>>(url, headers: await _getAuthHeaders());
+    if (result.isError) return Result.error(result.error);
+    
+    final users = (result.value['users'] as List<dynamic>?)
+            ?.map((u) => User.fromJson(u as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return Result.success(users);
+  }
+
+  /// Get users that can be assigned to tasks (Managers + Agents)
+  Future<Result<List<User>, ApiError>> getTaskAssignableUsers() async {
+    if (!_authService.isAuthenticated) return Result.error(ApiError.unauthorized());
+    final url = '${ApiConfig.users}/assignable?type=task';
+    final result = await _apiClient.get<Map<String, dynamic>>(url, headers: await _getAuthHeaders());
+    if (result.isError) return Result.error(result.error);
+    
+    final users = (result.value['users'] as List<dynamic>?)
+            ?.map((u) => User.fromJson(u as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return Result.success(users);
+  }
+
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = _authService.jwtToken;
     final orgId = _authService.selectedOrganizationId;

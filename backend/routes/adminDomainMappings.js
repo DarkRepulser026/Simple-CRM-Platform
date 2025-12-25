@@ -1,12 +1,11 @@
 /**
  * Admin Domain Mapping Management Routes
- * Configure auto-assignment rules for customer domains
+ * Maps email domains to accounts for lead conversion
  */
 
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
-const { getActiveAutoAssignDomains, getOrganizationDomains } = require('../lib/organizationMatcher');
 
 const prisma = new PrismaClient();
 
@@ -25,9 +24,15 @@ router.get('/', async (req, res) => {
             isActive: true,
           },
         },
+        account: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
+        },
       },
       orderBy: [
-        { priority: 'desc' },
         { domain: 'asc' },
       ],
     });
@@ -40,9 +45,9 @@ router.get('/', async (req, res) => {
         domain: m.domain,
         organizationId: m.organizationId,
         organizationName: m.organization.name,
-        isActive: m.isActive,
-        autoAssign: m.autoAssign,
-        priority: m.priority,
+        accountId: m.accountId,
+        accountName: m.account?.name,
+        verified: m.verified,
         createdAt: m.createdAt,
       })),
     });
@@ -53,12 +58,23 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET /api/admin/domain-mappings/active
- * Get only active auto-assign domain mappings
+ * GET /api/admin/domain-mappings/verified
+ * Get only verified domain mappings (for quick reference)
  */
-router.get('/active', async (req, res) => {
+router.get('/verified', async (req, res) => {
   try {
-    const mappings = await getActiveAutoAssignDomains();
+    const mappings = await prisma.organizationDomain.findMany({
+      where: { verified: true },
+      include: {
+        organization: {
+          select: { id: true, name: true },
+        },
+        account: {
+          select: { id: true, name: true },
+        },
+      },
+      orderBy: { domain: 'asc' },
+    });
     
     res.json({
       success: true,
@@ -68,11 +84,12 @@ router.get('/active', async (req, res) => {
         domain: m.domain,
         organizationId: m.organizationId,
         organizationName: m.organization.name,
-        priority: m.priority,
+        accountId: m.accountId,
+        accountName: m.account?.name,
       })),
     });
   } catch (error) {
-    console.error('Error getting active domain mappings:', error);
+    console.error('Error getting verified domain mappings:', error);
     res.status(500).json({ error: 'Failed to get active domain mappings' });
   }
 });
@@ -84,7 +101,19 @@ router.get('/active', async (req, res) => {
 router.get('/organization/:organizationId', async (req, res) => {
   try {
     const { organizationId } = req.params;
-    const mappings = await getOrganizationDomains(organizationId);
+    const mappings = await prisma.organizationDomain.findMany({
+      where: { organizationId },
+      include: {
+        account: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+          },
+        },
+      },
+      orderBy: { domain: 'asc' },
+    });
 
     res.json({
       success: true,
@@ -104,7 +133,7 @@ router.get('/organization/:organizationId', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { organizationId, domain, autoAssign = true, priority = 0 } = req.body;
+    const { organizationId, accountId, domain, verified = false } = req.body;
     const adminUserId = req.user?.id;
 
     // Validation
@@ -127,17 +156,37 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Organization not found' });
     }
 
-    // Check if domain already exists
+    // Check if account exists (if provided)
+    if (accountId) {
+      const account = await prisma.account.findUnique({
+        where: { id: accountId },
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+
+      if (account.organizationId !== organizationId) {
+        return res.status(400).json({ error: 'Account does not belong to this organization' });
+      }
+    }
+
+    // Check if domain already exists for this organization
     const existing = await prisma.organizationDomain.findUnique({
-      where: { domain: domain.toLowerCase().trim() },
+      where: { 
+        domain_organizationId: {
+          domain: domain.toLowerCase().trim(),
+          organizationId: organizationId
+        }
+      },
     });
 
     if (existing) {
       return res.status(409).json({ 
-        error: 'Domain already mapped to another organization',
+        error: 'Domain already mapped in this organization',
         existingMapping: {
           domain: existing.domain,
-          organizationId: existing.organizationId,
+          accountId: existing.accountId,
         },
       });
     }
@@ -146,13 +195,19 @@ router.post('/', async (req, res) => {
     const mapping = await prisma.organizationDomain.create({
       data: {
         organizationId,
+        accountId,
         domain: domain.toLowerCase().trim(),
-        autoAssign: autoAssign,
-        priority: priority,
+        verified,
         createdBy: adminUserId,
       },
       include: {
         organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        account: {
           select: {
             id: true,
             name: true,
@@ -167,12 +222,12 @@ router.post('/', async (req, res) => {
         action: 'DOMAIN_MAPPING_CREATED',
         entityType: 'OrganizationDomain',
         entityId: mapping.id,
-        description: `Domain ${mapping.domain} mapped to ${organization.name}`,
+        description: `Domain ${mapping.domain} mapped to ${mapping.account?.name || 'no account'}`,
         userId: adminUserId,
         organizationId,
         metadata: {
           domain: mapping.domain,
-          autoAssign: mapping.autoAssign,
+          accountId: mapping.accountId,
         },
       },
     });
@@ -185,8 +240,9 @@ router.post('/', async (req, res) => {
         domain: mapping.domain,
         organizationId: mapping.organizationId,
         organizationName: mapping.organization.name,
-        autoAssign: mapping.autoAssign,
-        priority: mapping.priority,
+        accountId: mapping.accountId,
+        accountName: mapping.account?.name,
+        verified: mapping.verified,
       },
     });
   } catch (error) {

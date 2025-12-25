@@ -22,6 +22,8 @@ class _TasksListScreenState extends State<TasksListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String? _selectedStatus;
   String? _selectedPriority;
+  bool _showMyTasksOnly = false;
+  bool _showOverdueOnly = false;
   int _filterVersion = 0;
 
   @override
@@ -31,30 +33,63 @@ class _TasksListScreenState extends State<TasksListScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Parse URL query parameters on first build
+    final uri = ModalRoute.of(context)?.settings.name;
+    if (uri != null && uri.contains('?')) {
+      final queryParams = Uri.parse(uri).queryParameters;
+      if (queryParams['overdue'] == 'true') {
+        setState(() {
+          _showOverdueOnly = true;
+        });
+      }
+      if (queryParams['status'] != null) {
+        setState(() {
+          _selectedStatus = queryParams['status'];
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<PaginatedResponse<Task>> _fetchPaginatedTasks(int page, int limit) async {
+  Future<PaginatedResponse<Task>> _fetchPaginatedTasks(
+    int page,
+    int limit,
+  ) async {
     try {
+      final auth = locator<AuthService>();
+      final currentUserId = _showMyTasksOnly ? auth.currentUser?.id : null;
+
       final res = await _tasksService.getTasks(
         page: page,
         limit: limit,
         status: _selectedStatus,
         priority: _selectedPriority,
         q: _searchCtrl.text.isEmpty ? null : _searchCtrl.text,
+        ownerId: currentUserId,
+        overdue: _showOverdueOnly ? true : null,
       );
       if (res.isSuccess) {
-        final pagination = res.value.pagination ?? Pagination(
-          page: page,
-          limit: limit,
-          total: res.value.tasks.length,
-          totalPages: 1,
-          hasNext: false,
-          hasPrev: false,
+        final pagination =
+            res.value.pagination ??
+            Pagination(
+              page: page,
+              limit: limit,
+              total: res.value.tasks.length,
+              totalPages: 1,
+              hasNext: false,
+              hasPrev: false,
+            );
+        return PaginatedResponse<Task>(
+          items: res.value.tasks,
+          pagination: pagination,
         );
-        return PaginatedResponse<Task>(items: res.value.tasks, pagination: pagination);
       }
       throw Exception(res.error.message);
     } catch (e) {
@@ -79,8 +114,10 @@ class _TasksListScreenState extends State<TasksListScreen> {
     if (auth.isLoggedIn && !auth.hasSelectedOrganization) {
       return Scaffold(
         body: ErrorView(
-          message: 'No organization selected. Please select a company to continue.',
-          onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection),
+          message:
+              'No organization selected. Please select a company to continue.',
+          onRetry: () =>
+              AppRouter.navigateTo(context, AppRouter.companySelection),
         ),
       );
     }
@@ -97,7 +134,10 @@ class _TasksListScreenState extends State<TasksListScreen> {
         titleSpacing: 24,
         title: Row(
           children: [
-            const Text('Tasks', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+            const Text(
+              'Tasks',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -107,7 +147,11 @@ class _TasksListScreenState extends State<TasksListScreen> {
               ),
               child: Text(
                 'CRM Board',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.primary),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: cs.primary,
+                ),
               ),
             ),
           ],
@@ -142,13 +186,20 @@ class _TasksListScreenState extends State<TasksListScreen> {
                           fillColor: const Color(0xFFF1F5F9),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Colors.transparent),
+                            borderSide: const BorderSide(
+                              color: Colors.transparent,
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                            borderSide: BorderSide(
+                              color: cs.outline.withOpacity(0.1),
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 12,
+                          ),
                         ),
                         onSubmitted: (_) => _refreshList(),
                         onChanged: (_) => _refreshList(),
@@ -169,10 +220,31 @@ class _TasksListScreenState extends State<TasksListScreen> {
                         underline: const SizedBox(),
                         isDense: true,
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('All Priorities')),
-                          DropdownMenuItem(value: 'High', child: Text('High', style: TextStyle(color: Colors.red[700]))),
-                          DropdownMenuItem(value: 'Normal', child: Text('Normal', style: TextStyle(color: cs.primary))),
-                          DropdownMenuItem(value: 'Low', child: Text('Low', style: TextStyle(color: Colors.amber[700]))),
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('All Priorities'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'High',
+                            child: Text(
+                              'High',
+                              style: TextStyle(color: Colors.red[700]),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Normal',
+                            child: Text(
+                              'Normal',
+                              style: TextStyle(color: cs.primary),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Low',
+                            child: Text(
+                              'Low',
+                              style: TextStyle(color: Colors.amber[700]),
+                            ),
+                          ),
                         ],
                         onChanged: (val) => setState(() {
                           _selectedPriority = val;
@@ -195,11 +267,26 @@ class _TasksListScreenState extends State<TasksListScreen> {
                         underline: const SizedBox(),
                         isDense: true,
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('All Status')),
-                          const DropdownMenuItem(value: 'NotStarted', child: Text('Not Started')),
-                          const DropdownMenuItem(value: 'InProgress', child: Text('In Progress')),
-                          const DropdownMenuItem(value: 'Completed', child: Text('Completed')),
-                          const DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('All Status'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'NotStarted',
+                            child: Text('Not Started'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'InProgress',
+                            child: Text('In Progress'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'Completed',
+                            child: Text('Completed'),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'Cancelled',
+                            child: Text('Cancelled'),
+                          ),
                         ],
                         onChanged: (val) => setState(() {
                           _selectedStatus = val;
@@ -209,10 +296,53 @@ class _TasksListScreenState extends State<TasksListScreen> {
                     ),
                     const SizedBox(width: 12),
 
+                    // "My Tasks" Filter Chip
+                    FilterChip(
+                      label: const Text('My Tasks'),
+                      selected: _showMyTasksOnly,
+                      onSelected: (selected) => setState(() {
+                        _showMyTasksOnly = selected;
+                        _filterVersion++;
+                      }),
+                      avatar: Icon(
+                        _showMyTasksOnly ? Icons.person : Icons.person_outline,
+                        size: 18,
+                      ),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      selectedColor: cs.primary.withOpacity(0.15),
+                      side: BorderSide(color: cs.outline.withOpacity(0.1)),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // "Overdue" Filter Chip
+                    FilterChip(
+                      label: const Text('Overdue'),
+                      selected: _showOverdueOnly,
+                      onSelected: (selected) => setState(() {
+                        _showOverdueOnly = selected;
+                        _filterVersion++;
+                      }),
+                      avatar: Icon(
+                        _showOverdueOnly ? Icons.warning : Icons.warning_amber_outlined,
+                        size: 18,
+                      ),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      selectedColor: Colors.red.withOpacity(0.15),
+                      side: BorderSide(
+                        color: _showOverdueOnly 
+                            ? Colors.red.withOpacity(0.3)
+                            : cs.outline.withOpacity(0.1)
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
                     // New Task Button
                     FilledButton.icon(
                       onPressed: () async {
-                        final res = await AppRouter.navigateTo(context, AppRouter.taskCreate);
+                        final res = await AppRouter.navigateTo(
+                          context,
+                          AppRouter.taskCreate,
+                        );
                         if (res == true) _refreshList();
                       },
                       icon: const Icon(Icons.add, size: 18),
@@ -310,7 +440,8 @@ class _TaskCard extends StatelessWidget {
                     const SizedBox(height: 4),
 
                     // Description
-                    if (task.description != null && task.description!.isNotEmpty)
+                    if (task.description != null &&
+                        task.description!.isNotEmpty)
                       Text(
                         task.description!,
                         maxLines: 1,
@@ -320,13 +451,35 @@ class _TaskCard extends StatelessWidget {
                         ),
                       ),
 
+                    // Owner (Assigned To)
+                    if (task.ownerName != null &&
+                        task.ownerName!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.person, size: 14, color: cs.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            task.ownerName!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     // Meta Info (Priority, Status, Due Date)
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         // Priority Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: priorityColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
@@ -343,7 +496,10 @@ class _TaskCard extends StatelessWidget {
 
                         // Status Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: statusBg,
                             borderRadius: BorderRadius.circular(6),
@@ -367,13 +523,21 @@ class _TaskCard extends StatelessWidget {
                         // Due Date
                         if (task.dueDate != null) ...[
                           const SizedBox(width: 8),
-                          Icon(Icons.calendar_today, size: 12, color: cs.onSurfaceVariant),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(task.dueDate!),
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: task.isOverdue ? cs.error : cs.onSurfaceVariant,
-                              fontWeight: task.isOverdue ? FontWeight.w600 : null,
+                              color: task.isOverdue
+                                  ? cs.error
+                                  : cs.onSurfaceVariant,
+                              fontWeight: task.isOverdue
+                                  ? FontWeight.w600
+                                  : null,
                             ),
                           ),
                         ],
@@ -413,13 +577,25 @@ class _TaskCard extends StatelessWidget {
   (Color, Color, IconData) _getStatusStyle(TaskStatus status, ColorScheme cs) {
     switch (status) {
       case TaskStatus.completed:
-        return (Colors.green.withOpacity(0.1), Colors.green[700]!, Icons.check_circle);
+        return (
+          Colors.green.withOpacity(0.1),
+          Colors.green[700]!,
+          Icons.check_circle,
+        );
       case TaskStatus.inProgress:
-        return (Colors.blue.withOpacity(0.1), Colors.blue[700]!, Icons.schedule);
+        return (
+          Colors.blue.withOpacity(0.1),
+          Colors.blue[700]!,
+          Icons.schedule,
+        );
       case TaskStatus.cancelled:
         return (cs.surfaceVariant, cs.onSurfaceVariant, Icons.cancel);
       default:
-        return (Colors.orange.withOpacity(0.1), Colors.orange[800]!, Icons.schedule);
+        return (
+          Colors.orange.withOpacity(0.1),
+          Colors.orange[800]!,
+          Icons.schedule,
+        );
     }
   }
 

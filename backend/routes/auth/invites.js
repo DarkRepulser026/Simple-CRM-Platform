@@ -20,19 +20,34 @@ router.post('/organizations/:id/invite', authenticateToken, requireOrganization,
     const { email, role } = req.body;
     if (!email || !role) return res.status(400).json({ message: 'Email and role required' });
     
+    // Resolve role
+    let roleEnum = null;
     const allowed = ['ADMIN', 'MANAGER', 'AGENT', 'VIEWER'];
-    if (!allowed.includes(role)) return res.status(400).json({ message: 'Invalid role' });
+    
+    if (allowed.includes(role)) {
+      roleEnum = role;
+    } else {
+      // Check if it's a custom role name
+      const userRole = await prisma.userRole.findFirst({
+        where: { organizationId: orgId, name: role }
+      });
+      if (userRole) {
+        roleEnum = userRole.roleType;
+      }
+    }
 
-    const token = jwt.sign({ email, orgId, role, createdBy: req.user.id }, JWT_SECRET, { expiresIn: '48h' });
+    if (!roleEnum) return res.status(400).json({ message: 'Invalid role' });
+
+    const token = jwt.sign({ email, orgId, role: roleEnum, createdBy: req.user.id }, JWT_SECRET, { expiresIn: '48h' });
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + 48*3600*1000);
     
     await prisma.invitation.create({ 
-      data: { email, role, organizationId: orgId, tokenHash, expiresAt, createdBy: req.user.id } 
+      data: { email, role: roleEnum, organizationId: orgId, tokenHash, expiresAt, createdBy: req.user.id } 
     });
     
     const link = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/invite/accept?token=${token}`;
-    await mailer.sendInviteEmail(email, link, role);
+    await mailer.sendInviteEmail(email, link, role); // Send the display name (e.g. "Sales Agent") in email
     
     await createActivityLogEntry({ 
       action: 'INVITE_CREATED', 

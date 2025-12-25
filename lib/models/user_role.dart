@@ -10,7 +10,7 @@ enum UserRoleType {
 
   static UserRoleType fromString(String value) {
     return UserRoleType.values.firstWhere(
-      (role) => role.value == value,
+      (role) => role.value.toUpperCase() == value.toUpperCase() || role.name.toUpperCase() == value.toUpperCase(),
       orElse: () => UserRoleType.viewer,
     );
   }
@@ -18,6 +18,12 @@ enum UserRoleType {
 
 /// Permission enumeration for granular access control
 enum Permission {
+  // Account permissions
+  viewAccounts('view_accounts'),
+  createAccounts('create_accounts'),
+  editAccounts('edit_accounts'),
+  deleteAccounts('delete_accounts'),
+
   // Contact permissions
   viewContacts('view_contacts'),
   createContacts('create_contacts'),
@@ -115,11 +121,14 @@ class UserRole {
         return Permission.values; // All permissions
       case UserRoleType.manager:
         return [
+          // Account permissions
+          Permission.viewAccounts,
+          Permission.createAccounts,
+          Permission.editAccounts,
           // Contact permissions
           Permission.viewContacts,
           Permission.createContacts,
           Permission.editContacts,
-          Permission.deleteContacts,
           // Lead permissions
           Permission.viewLeads,
           Permission.createLeads,
@@ -128,13 +137,10 @@ class UserRole {
           // Ticket permissions
           Permission.viewTickets,
           Permission.createTickets,
-          Permission.editTickets,
           Permission.assignTickets,
-          Permission.resolveTickets,
           // Task permissions
           Permission.viewTasks,
           Permission.createTasks,
-          Permission.editTasks,
           Permission.assignTasks,
           // Dashboard permissions
           Permission.viewDashboard,
@@ -144,6 +150,9 @@ class UserRole {
         ];
       case UserRoleType.agent:
         return [
+          // Account permissions
+          Permission.viewAccounts,
+          Permission.editAccounts,
           // Contact permissions
           Permission.viewContacts,
           Permission.createContacts,
@@ -156,8 +165,6 @@ class UserRole {
           // Ticket permissions
           Permission.viewTickets,
           Permission.createTickets,
-          Permission.editTickets,
-          Permission.resolveTickets,
           // Task permissions
           Permission.viewTasks,
           Permission.createTasks,
@@ -168,6 +175,7 @@ class UserRole {
       case UserRoleType.viewer:
         return [
           // Read-only permissions
+          Permission.viewAccounts,
           Permission.viewContacts,
           Permission.viewLeads,
           Permission.viewTickets,

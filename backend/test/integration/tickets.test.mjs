@@ -2,7 +2,7 @@ import { spawnServer, waitForHealth, stopServer, createAdminUserAndOrg, createOr
 import fetch from 'node-fetch';
 import { expect } from 'chai';
 
-const BASE_URL = `http://localhost:${process.env.PORT || 3001}`;
+const BASE_URL = `http://localhost:${process.env.PORT || 3001}/api`;
 let serverProc;
 let adminToken;
 let adminUserId;
@@ -10,7 +10,7 @@ let orgId;
 let ticketId;
 
 async function createTicket() {
-  const ticketRes = await fetch(`${BASE_URL}/tickets`, {
+  const ticketRes = await fetch(`${BASE_URL}/tickets/staff`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId },
     body: JSON.stringify({ subject: 'Integration Test Ticket', description: 'Created by tests' })
@@ -40,7 +40,7 @@ describe('Tickets API - Integration tests', function() {
     try {
       // Attempt to delete created org (which will clean up DB objects for this test)
       if (orgId) {
-        await fetch(`${BASE_URL}/organizations/${orgId}`, {
+        await fetch(`${BASE_URL}/admin/organizations/${orgId}`, {
           method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` }
         });
       }
@@ -50,15 +50,15 @@ describe('Tickets API - Integration tests', function() {
     await stopServer();
   });
 
-  it('should assign a ticket (POST /tickets/:id/assign)', async () => {
-    const res = await fetch(`${BASE_URL}/tickets/${ticketId}/assign`, {
+  it('should assign a ticket (POST /tickets/staff/:id/assign)', async () => {
+    const res = await fetch(`${BASE_URL}/tickets/staff/${ticketId}/assign`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId },
       body: JSON.stringify({ assignedToId: adminUserId })
     });
     // We will assign the ticket to the same user via PUT as fallback if the route validation fails
     if (res.status === 400) {
       // use PUT to set owner
-      const putRes = await fetch(`${BASE_URL}/tickets/${ticketId}`, {
+      const putRes = await fetch(`${BASE_URL}/tickets/staff/${ticketId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId },
         body: JSON.stringify({ ownerId: null })
       });
@@ -70,8 +70,8 @@ describe('Tickets API - Integration tests', function() {
     }
   });
 
-  it('should resolve a ticket (POST /tickets/:id/resolve)', async () => {
-    const res = await fetch(`${BASE_URL}/tickets/${ticketId}/resolve`, {
+  it('should resolve a ticket (POST /tickets/staff/:id/resolve)', async () => {
+    const res = await fetch(`${BASE_URL}/tickets/staff/${ticketId}/resolve`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId },
       body: JSON.stringify({ resolution: 'Fixed in tests' })
     });
@@ -80,8 +80,8 @@ describe('Tickets API - Integration tests', function() {
     expect(json.status).to.equal('RESOLVED');
   });
 
-  it('should close a ticket (POST /tickets/:id/close)', async () => {
-    const res = await fetch(`${BASE_URL}/tickets/${ticketId}/close`, {
+  it('should close a ticket (POST /tickets/staff/:id/close)', async () => {
+    const res = await fetch(`${BASE_URL}/tickets/staff/${ticketId}/close`, {
       method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId }
     });
     expect(res.ok).to.be.true;
@@ -89,8 +89,8 @@ describe('Tickets API - Integration tests', function() {
     expect(json.status).to.equal('CLOSED');
   });
 
-  it('should reopen a ticket (POST /tickets/:id/reopen)', async () => {
-    const res = await fetch(`${BASE_URL}/tickets/${ticketId}/reopen`, {
+  it('should reopen a ticket (POST /tickets/staff/:id/reopen)', async () => {
+    const res = await fetch(`${BASE_URL}/tickets/staff/${ticketId}/reopen`, {
       method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}`, 'X-Organization-ID': orgId }
     });
     expect(res.ok).to.be.true;

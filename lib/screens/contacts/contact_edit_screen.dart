@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../models/contact.dart';
 import '../../services/service_locator.dart';
 import '../../services/contacts_service.dart';
+import '../../services/accounts_service.dart';
 import '../../services/users_service.dart';
 import '../../models/user.dart';
+import '../../models/account.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/error_view.dart';
 
@@ -76,8 +78,10 @@ class _ContactEditDialog extends StatefulWidget {
 
 class _ContactEditDialogState extends State<_ContactEditDialog> {
   late final ContactsService _contactsService;
+  late final AccountsService _accountsService;
   late final UsersService _usersService;
   List<User>? _users;
+  List<Account>? _accounts;
 
   final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
@@ -95,6 +99,7 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
   final _longitudeCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   String? _selectedOwnerId;
+  String? _selectedAccountId;
 
   bool _isLoading = true; // load contact
   bool _isSaving = false; // saving state
@@ -105,6 +110,7 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
   void initState() {
     super.initState();
     _contactsService = locator<ContactsService>();
+    _accountsService = locator<AccountsService>();
     _usersService = locator<UsersService>();
     _load();
     debugPrint('ContactEditDialog:init');
@@ -134,7 +140,8 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
       _longitudeCtrl.text = _contact!.longitude?.toString() ?? '';
       _descriptionCtrl.text = _contact!.description ?? '';
       _selectedOwnerId = _contact!.ownerId ?? _contact!.owner?.id;
-        await _loadUsers();
+      _selectedAccountId = _contact!.accountId;
+        await _loadData();
       setState(() => _isLoading = false);
     } else {
       debugPrint('Failed to load contact ${widget.contactId}: ${res.error.message}');
@@ -145,15 +152,12 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
     }
   }
 
-  Future<void> _loadUsers() async {
-    final res = await _usersService.getUsers(limit: 200);
-    if (res.isSuccess) {
-      setState(() {
-        _users = res.value.users;
-      });
-    } else {
-        debugPrint('Failed to load users for ContactEdit: ${res.error.message}');
-    }
+  Future<void> _loadData() async {
+    final usersRes = await _usersService.getUsers(limit: 200);
+    if (usersRes.isSuccess) setState(() => _users = usersRes.value.users);
+
+    final accountsRes = await _accountsService.getAccounts(limit: 1000);
+    if (accountsRes.isSuccess) setState(() => _accounts = accountsRes.value.accounts);
   }
 
   Future<void> _save() async {
@@ -183,6 +187,7 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
       createdAt: _contact!.createdAt,
       updatedAt: DateTime.now(),
       ownerId: _selectedOwnerId ?? _contact!.ownerId,
+      accountId: _selectedAccountId,
       organizationId: _contact!.organizationId,
     );
 
@@ -409,6 +414,20 @@ class _ContactEditDialogState extends State<_ContactEditDialog> {
                     Expanded(child: TextFormField(controller: _longitudeCtrl, decoration: const InputDecoration(labelText: 'Longitude'), keyboardType: TextInputType.number)),
                   ])),
                 ],
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: _selectedAccountId,
+                decoration: const InputDecoration(
+                  labelText: 'Account (Required)',
+                  prefixIcon: Icon(Icons.business),
+                ),
+                items: (_accounts ?? []).map((a) => DropdownMenuItem<String?>(
+                  value: a.id,
+                  child: Text(a.name),
+                )).toList(),
+                validator: (v) => (v == null) ? 'Please select an account' : null,
+                onChanged: (v) => setState(() => _selectedAccountId = v),
               ),
               const SizedBox(height: 12),
               Row(children: [

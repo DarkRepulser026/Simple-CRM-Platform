@@ -1,7 +1,11 @@
 export const validateContact = (req, res, next) => {
-  const { firstName, lastName } = req.body;
+  const { firstName, lastName, accountId } = req.body;
   if (!firstName || !lastName) {
     return res.status(400).json({ message: 'First name and last name are required' });
+  }
+  // Rule #1: Contact must have an account
+  if (!accountId) {
+    return res.status(400).json({ message: 'Account ID is required. A contact must belong to an account.' });
   }
   next();
 };

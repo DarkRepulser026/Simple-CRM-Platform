@@ -45,7 +45,11 @@ class Task {
   final TaskPriority priority;
   final DateTime? dueDate;
   final String? ownerId;
+  final String? ownerName;
+  final String? ownerEmail;
   final String? createdById;
+  final String? createdByName;
+  final String? createdByEmail;
   final String? accountId;
   final String? contactId;
   final String? leadId;
@@ -63,7 +67,11 @@ class Task {
     required this.priority,
     this.dueDate,
     this.ownerId,
+    this.ownerName,
+    this.ownerEmail,
     this.createdById,
+    this.createdByName,
+    this.createdByEmail,
     this.accountId,
     this.contactId,
     this.leadId,
@@ -93,7 +101,11 @@ class Task {
       priority: TaskPriority.fromString(json['priority'] ?? 'Normal'),
       dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
       ownerId: json['ownerId'],
+      ownerName: json['owner'] != null ? json['owner']['name'] : null,
+      ownerEmail: json['owner'] != null ? json['owner']['email'] : null,
       createdById: json['createdById'],
+      createdByName: json['createdBy'] != null ? json['createdBy']['name'] : null,
+      createdByEmail: json['createdBy'] != null ? json['createdBy']['email'] : null,
       accountId: json['accountId'],
       contactId: json['contactId'],
       leadId: json['leadId'],
@@ -140,7 +152,11 @@ class Task {
     TaskPriority? priority,
     DateTime? dueDate,
     String? ownerId,
+    String? ownerName,
+    String? ownerEmail,
     String? createdById,
+    String? createdByName,
+    String? createdByEmail,
     String? accountId,
     String? contactId,
     String? leadId,
@@ -158,7 +174,11 @@ class Task {
       priority: priority ?? this.priority,
       dueDate: dueDate ?? this.dueDate,
       ownerId: ownerId ?? this.ownerId,
+      ownerName: ownerName ?? this.ownerName,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
       createdById: createdById ?? this.createdById,
+      createdByName: createdByName ?? this.createdByName,
+      createdByEmail: createdByEmail ?? this.createdByEmail,
       accountId: accountId ?? this.accountId,
       contactId: contactId ?? this.contactId,
       leadId: leadId ?? this.leadId,

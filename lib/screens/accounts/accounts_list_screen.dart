@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:main_project/screens/accounts/account_detail_screen.dart';
+import 'package:main_project/screens/accounts/account_edit_screen.dart';
 import '../../models/account.dart';
 import '../../widgets/paginated_list_view.dart';
 import '../../services/service_locator.dart';
@@ -199,8 +200,9 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
                                   const SizedBox(width: 48), // Avatar space
                                   _HeaderCell('Account Name', flex: 4),
                                   _HeaderCell('Type', flex: 3),
-                                  _HeaderCell('Status', flex: 2), // Mock column
-                                  _HeaderCell('Created', flex: 2, align: TextAlign.right), // Mock column
+                                  _HeaderCell('Status', flex: 2),
+                                  _HeaderCell('Created', flex: 2, align: TextAlign.right),
+                                  const SizedBox(width: 48), // Actions space
                                 ],
                               ),
                             ),
@@ -217,6 +219,7 @@ class _AccountsListScreenState extends State<AccountsListScreen> {
                                 itemBuilder: (context, acc, index) => _AccountRow(
                                   account: acc,
                                   onTap: () => _navigateToAccountDetail(acc.id),
+                                  onRefresh: _refreshList,
                                 ),
                               ),
                             ),
@@ -268,7 +271,8 @@ class _HeaderCell extends StatelessWidget {
 class _AccountRow extends StatelessWidget {
   final Account account;
   final VoidCallback onTap;
-  const _AccountRow({required this.account, required this.onTap});
+  final VoidCallback onRefresh;
+  const _AccountRow({required this.account, required this.onTap, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -285,6 +289,7 @@ class _AccountRow extends StatelessWidget {
         ),
         child: Row(
           children: [
+            const SizedBox(width: 48), // Avatar space to align with header
             // Name + Avatar
             Expanded(
               flex: 4,
@@ -340,6 +345,24 @@ class _AccountRow extends StatelessWidget {
             const Expanded(
               flex: 2,
               child: Text('—', textAlign: TextAlign.right, style: TextStyle(color: Colors.grey)),
+            ),
+            // Actions
+            SizedBox(
+              width: 48,
+              child: IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                tooltip: 'Edit',
+                onPressed: () async {
+                  final res = await AppRouter.navigateTo(
+                    context,
+                    AppRouter.accountEdit,
+                    arguments: AccountEditArgs(accountId: account.id),
+                  );
+                  if (res == true) {
+                    onRefresh();
+                  }
+                },
+              ),
             ),
           ],
         ),

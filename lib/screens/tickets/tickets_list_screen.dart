@@ -21,6 +21,7 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String? _selectedStatus;
   String? _selectedPriority;
+  bool _showMyTicketsOnly = false;
   int _reloadVersion = 0;
 
   @override
@@ -49,7 +50,8 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
       return Scaffold(
         body: ErrorView(
           message: 'No organization selected.',
-          onRetry: () => AppRouter.navigateTo(context, AppRouter.companySelection),
+          onRetry: () =>
+              AppRouter.navigateTo(context, AppRouter.companySelection),
         ),
       );
     }
@@ -114,17 +116,24 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                               fillColor: Colors.white,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: cs.outline.withOpacity(0.2)),
+                                borderSide: BorderSide(
+                                  color: cs.outline.withOpacity(0.2),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: cs.outline.withOpacity(0.2)),
+                                borderSide: BorderSide(
+                                  color: cs.outline.withOpacity(0.2),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: cs.primary),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 12,
+                              ),
                             ),
                             onChanged: (_) => _refreshList(),
                           ),
@@ -135,7 +144,10 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                           child: DropdownButtonFormField<String>(
                             value: _selectedStatus,
                             items: [
-                              const DropdownMenuItem(value: null, child: Text('All Statuses')),
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text('All Statuses'),
+                              ),
                               DropdownMenuItem(
                                 value: 'OPEN',
                                 child: Row(
@@ -217,7 +229,10 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                               filled: true,
                               fillColor: Colors.white,
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -227,7 +242,10 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                           child: DropdownButtonFormField<String>(
                             value: _selectedPriority,
                             items: [
-                              const DropdownMenuItem(value: null, child: Text('All Priorities')),
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text('All Priorities'),
+                              ),
                               const DropdownMenuItem(
                                 value: 'URGENT',
                                 child: Text('Urgent'),
@@ -257,14 +275,41 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                               filled: true,
                               fillColor: Colors.white,
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 12,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 16),
+
+                        // "My Tickets" Filter Chip
+                        FilterChip(
+                          label: const Text('My Tickets'),
+                          selected: _showMyTicketsOnly,
+                          onSelected: (selected) => setState(() {
+                            _showMyTicketsOnly = selected;
+                            _reloadVersion++;
+                          }),
+                          avatar: Icon(
+                            _showMyTicketsOnly
+                                ? Icons.person
+                                : Icons.person_outline,
+                            size: 18,
+                          ),
+                          backgroundColor: Colors.white,
+                          selectedColor: cs.primary.withOpacity(0.15),
+                          side: BorderSide(color: cs.outline.withOpacity(0.2)),
+                        ),
+                        const SizedBox(width: 16),
+
                         FilledButton.icon(
                           onPressed: () async {
-                            final res = await AppRouter.navigateTo(context, AppRouter.ticketCreate);
+                            final res = await AppRouter.navigateTo(
+                              context,
+                              AppRouter.ticketCreate,
+                            );
                             if (res == true) _refreshList();
                           },
                           icon: const Icon(Icons.add, size: 18),
@@ -281,16 +326,25 @@ class _TicketsListScreenState extends State<TicketsListScreen> {
                     child: PaginatedListView<Ticket>(
                       key: ValueKey(_reloadVersion),
                       fetchPaginated: (page, limit) async {
+                        final auth = locator<AuthService>();
+                        final currentUserId = _showMyTicketsOnly
+                            ? auth.currentUser?.id
+                            : null;
+
                         final res = await _ticketsService.getTickets(
                           page: page,
                           limit: limit,
                           status: _selectedStatus,
                           priority: _selectedPriority,
-                          search: _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
+                          search: _searchCtrl.text.isNotEmpty
+                              ? _searchCtrl.text
+                              : null,
+                          ownerId: currentUserId,
                         );
                         if (res.isSuccess) {
                           final ticketsResp = res.value;
-                          final pagination = ticketsResp.pagination ?? 
+                          final pagination =
+                              ticketsResp.pagination ??
                               Pagination(
                                 page: page,
                                 limit: limit,
@@ -379,20 +433,19 @@ class _TicketCard extends StatelessWidget {
                           ticket.subject,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
-                        if (ticket.description != null && ticket.description!.isNotEmpty)
+                        if (ticket.description != null &&
+                            ticket.description!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               ticket.description!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
                             ),
                           ),
                       ],
@@ -401,7 +454,10 @@ class _TicketCard extends StatelessWidget {
                   const SizedBox(width: 12),
                   // Status Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusBg,
                       borderRadius: BorderRadius.circular(6),
@@ -430,7 +486,10 @@ class _TicketCard extends StatelessWidget {
                 children: [
                   // Priority Badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: priorityColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -448,7 +507,10 @@ class _TicketCard extends StatelessWidget {
                   // Owner
                   if (ticket.ownerName != null && ticket.ownerName!.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.secondaryContainer.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(4),
@@ -479,32 +541,31 @@ class _TicketCard extends StatelessWidget {
     );
   }
 
-  (Color, Color, IconData) _getStatusStyle(TicketStatus status, ColorScheme cs) {
+  (Color, Color, IconData) _getStatusStyle(
+    TicketStatus status,
+    ColorScheme cs,
+  ) {
     switch (status) {
       case TicketStatus.open:
         return (
           Colors.green.withOpacity(0.1),
           Colors.green[700]!,
-          Icons.circle
+          Icons.circle,
         );
       case TicketStatus.inProgress:
         return (
           Colors.blue.withOpacity(0.1),
           Colors.blue[700]!,
-          Icons.autorenew
+          Icons.autorenew,
         );
       case TicketStatus.resolved:
         return (
           Colors.cyan.withOpacity(0.1),
           Colors.cyan[700]!,
-          Icons.check_circle
+          Icons.check_circle,
         );
       case TicketStatus.closed:
-        return (
-          Colors.grey.withOpacity(0.15),
-          Colors.grey[700]!,
-          Icons.lock
-        );
+        return (Colors.grey.withOpacity(0.15), Colors.grey[700]!, Icons.lock);
     }
   }
 
