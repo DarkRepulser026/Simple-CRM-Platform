@@ -1,4 +1,6 @@
 import '../models/lead.dart';
+import '../models/contact.dart';
+import '../models/account.dart';
 import '../models/pagination.dart';
 import '../utils/result.dart';
 import 'api/api_client.dart';
@@ -25,6 +27,30 @@ class LeadsResponse {
       pagination: json['pagination'] != null
           ? Pagination.fromJson(json['pagination'] as Map<String, dynamic>)
           : null,
+    );
+  }
+}
+
+/// Response wrapper for lead conversion result
+class LeadConversionResult {
+  final Lead lead;
+  final Account? account;
+  final Contact? contact;
+  final Map<String, dynamic>? metadata;
+
+  const LeadConversionResult({
+    required this.lead,
+    this.account,
+    this.contact,
+    this.metadata,
+  });
+
+  factory LeadConversionResult.fromJson(Map<String, dynamic> json) {
+    return LeadConversionResult(
+      lead: Lead.fromJson(json['lead'] as Map<String, dynamic>? ?? {}),
+      account: json['account'] != null ? Account.fromJson(json['account'] as Map<String, dynamic>) : null,
+      contact: json['contact'] != null ? Contact.fromJson(json['contact'] as Map<String, dynamic>) : null,
+      metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
 }
@@ -170,9 +196,13 @@ class LeadsService {
   }
 
   /// Convert a lead to contact/account/opportunity
-  Future<Result<Lead, ApiError>> convertLead(
+  /// Supports converting with an existing account ID or creating a new account
+  /// Returns the conversion result with created/linked entities
+  Future<Result<LeadConversionResult, ApiError>> convertLead(
     String leadId, {
     String? accountId,
+    String? accountName,
+    String? accountDomain,
     String? contactId,
     String? opportunityId,
   }) async {
@@ -184,16 +214,36 @@ class LeadsService {
     final url = '${ApiConfig.leads}/$leadId/convert';
     final convertData = <String, dynamic>{};
 
-    if (accountId != null) convertData['accountId'] = accountId;
-    if (contactId != null) convertData['contactId'] = contactId;
-    if (opportunityId != null) convertData['opportunityId'] = opportunityId;
+    // Add account data: either existing ID or new account details
+    if (accountId != null && accountId.isNotEmpty) {
+      convertData['accountId'] = accountId;
+    } else if (accountName != null && accountName.isNotEmpty) {
+      convertData['accountName'] = accountName;
+      if (accountDomain != null && accountDomain.isNotEmpty) {
+        convertData['accountDomain'] = accountDomain;
+      }
+    }
 
-    return _apiClient.post<Lead>(
+    if (contactId != null && contactId.isNotEmpty) convertData['contactId'] = contactId;
+    if (opportunityId != null && opportunityId.isNotEmpty) convertData['opportunityId'] = opportunityId;
+
+    final result = await _apiClient.post<Map<String, dynamic>>(
       url,
       headers: await _getAuthHeaders(),
       body: convertData,
-      fromJson: Lead.fromJson,
+      fromJson: (json) => json,
     );
+
+    if (result.isError) {
+      return Result.error(result.error);
+    }
+
+    try {
+      final conversion = LeadConversionResult.fromJson(result.value);
+      return Result.success(conversion);
+    } catch (e) {
+      return Result.error(ApiError.parsing('Failed to parse conversion result: $e'));
+    }
   }
 
   /// Get authentication headers
@@ -212,5 +262,115 @@ class LeadsService {
     }
 
     return headers;
+  }
+
+  /// Get activity log for a specific lead
+  Future<Result<List<Map<String, dynamic>>, ApiError>> getLeadActivityLog({
+    required String leadId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    final url = '${ApiConfig.leads}/$leadId/activities';
+    final uri = Uri.parse(url).replace(queryParameters: queryParams);
+
+    final result = await _apiClient.get<Map<String, dynamic>>(
+      uri.toString(),
+      headers: await _getAuthHeaders(),
+      fromJson: (json) => json,
+    );
+
+    if (result.isError) {
+      return Result.error(result.error);
+    }
+
+    try {
+      final activities = (result.value['activities'] as List<dynamic>?)
+              ?.map((a) => a as Map<String, dynamic>)
+              .toList() ??
+          [];
+      return Result.success(activities);
+    } catch (e) {
+      return Result.error(ApiError.parsing('Failed to parse activities: $e'));
+    }
+  }
+
+  /// Batch get multiple leads by IDs
+  Future<Result<List<Lead>, ApiError>> getLeadsByIds(List<String> leadIds) async {
+    if (!_authService.isAuthenticated) {
+      return Result.error(ApiError.unauthorized());
+    }
+
+    if (leadIds.isEmpty) {
+      return Result.success([]);
+    }
+
+    final leads = <Lead>[];
+    for (final leadId in leadIds) {
+      final res = await getLead(leadId);
+      if (res.isSuccess) {
+        leads.add(res.value);
+      }
+    }
+    return Result.success(leads);
+  }
+
+  /// Get leads by source
+  Future<Result<LeadsResponse, ApiError>> getLeadsBySource(
+    String source, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return getLeads(
+      page: page,
+      limit: limit,
+      leadSource: source,
+    );
+  }
+
+  /// Get leads by status
+  Future<Result<LeadsResponse, ApiError>> getLeadsByStatus(
+    String status, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return getLeads(
+      page: page,
+      limit: limit,
+      status: status,
+    );
+  }
+
+  /// Get non-converted leads only
+  Future<Result<List<Lead>, ApiError>> getUnconvertedLeads() async {
+    final result = await getLeads(limit: 1000);
+    if (result.isError) return Result.error(result.error);
+    final leads = result.value.leads.where((l) => !l.isConverted).toList();
+    return Result.success(leads);
+  }
+
+  /// Search leads by multiple criteria
+  Future<Result<LeadsResponse, ApiError>> searchLeads(
+    String query, {
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? source,
+  }) async {
+    return getLeads(
+      page: page,
+      limit: limit,
+      search: query,
+      status: status,
+      leadSource: source,
+    );
   }
 }

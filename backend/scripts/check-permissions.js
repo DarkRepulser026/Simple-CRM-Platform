@@ -18,23 +18,34 @@ async function main() {
       process.exit(1);
     }
 
-    const userOrg = await prisma.userOrganization.findFirst({ where: { userId: user.id, organizationId: orgId } });
+    const userOrg = await prisma.userOrganization.findFirst({ 
+      where: { userId: user.id, organizationId: orgId },
+      include: { userRole: true }
+    });
     console.log('UserOrganization:', userOrg);
 
-    const roleType = userOrg?.role;
-    if (!roleType) {
-      console.log('User has no role assigned in this organization.');
+    let userRole = null;
+    
+    // Prefer userRoleId relationship if available
+    if (userOrg?.userRole) {
+      userRole = userOrg.userRole;
+      console.log('Using linked UserRole via userRoleId');
     } else {
-      const userRole = await prisma.userRole.findFirst({ where: { organizationId: orgId, roleType } });
-      console.log('UserRole:', userRole);
-      console.log('Permissions for role', roleType, '->', userRole?.permissions);
+      // Fallback: lookup by roleType
+      const roleType = userOrg?.role;
+      if (roleType) {
+        userRole = await prisma.userRole.findFirst({ where: { organizationId: orgId, roleType } });
+        console.log('Using fallback lookup by roleType:', roleType);
+      }
     }
+    
+    console.log('UserRole:', userRole);
+    console.log('Permissions ->', userRole?.permissions);
 
     // Check specific permissions
     const permsToCheck = ['CREATE_CONTACTS','CREATE_TASKS','CREATE_TICKETS','MANAGE_USERS'];
-    const role = await prisma.userRole.findFirst({ where: { organizationId: orgId, roleType } });
     const hasPerms = {};
-    permsToCheck.forEach((p) => hasPerms[p] = role?.permissions?.includes(p));
+    permsToCheck.forEach((p) => hasPerms[p] = userRole?.permissions?.includes(p));
     console.log('Has Permissions:', hasPerms);
   } catch (e) {
     console.error('Error checking permissions:', e);

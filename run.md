@@ -42,6 +42,7 @@ set PORT=3001
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
+npm run seed-large
 # start the server in dev mode (nodemon)
 npm run dev:backend
 ```
@@ -55,6 +56,7 @@ $env:PORT = "3001"
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
+npm run seed-large
 npm run dev:backend
 ```
 
@@ -67,6 +69,7 @@ export PORT=3001
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
+npm run seed-large
 npm run dev:backend
 ```
 
@@ -191,3 +194,4 @@ flutter run -d chrome --web-port=3000
 
 ---
 
+npm run db:fresh

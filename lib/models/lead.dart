@@ -101,6 +101,58 @@ class Lead {
     return daysSinceCreated > 30; // Consider overdue after 30 days
   }
 
+  /// Create a copy of Lead with modified fields
+  /// (Được thêm vào để hỗ trợ chức năng Edit)
+  Lead copyWith({
+    String? id,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? phone,
+    String? company,
+    String? title,
+    LeadStatus? status,
+    LeadSource? leadSource,
+    String? industry,
+    String? rating,
+    String? description,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? ownerId,
+    String? organizationId,
+    bool? isConverted,
+    DateTime? convertedAt,
+    String? convertedAccountId,
+    String? convertedContactId,
+    String? convertedOpportunityId,
+    String? contactId,
+  }) {
+    return Lead(
+      id: id ?? this.id,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      company: company ?? this.company,
+      title: title ?? this.title,
+      status: status ?? this.status,
+      leadSource: leadSource ?? this.leadSource,
+      industry: industry ?? this.industry,
+      rating: rating ?? this.rating,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      ownerId: ownerId ?? this.ownerId,
+      organizationId: organizationId ?? this.organizationId,
+      isConverted: isConverted ?? this.isConverted,
+      convertedAt: convertedAt ?? this.convertedAt,
+      convertedAccountId: convertedAccountId ?? this.convertedAccountId,
+      convertedContactId: convertedContactId ?? this.convertedContactId,
+      convertedOpportunityId: convertedOpportunityId ?? this.convertedOpportunityId,
+      contactId: contactId ?? this.contactId,
+    );
+  }
+
   factory Lead.fromJson(Map<String, dynamic> json) {
     return Lead(
       id: json['id'] as String? ?? '',

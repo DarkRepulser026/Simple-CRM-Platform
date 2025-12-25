@@ -32,6 +32,9 @@ abstract class AuthService {
   /// Stop impersonation and revert to original admin token
   Future<bool> stopImpersonation();
 
+  /// Debug: Sign in with email and password (development only)
+  Future<bool> signInWithEmailPassword(String email, String password);
+
   /// Whether the user is currently logged in
   bool get isLoggedIn;
 

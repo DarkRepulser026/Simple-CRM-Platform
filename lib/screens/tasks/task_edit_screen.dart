@@ -65,21 +65,181 @@ class _TaskEditScreenState extends State<TaskEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: LoadingView(message: 'Loading task...'));
-    if (_error != null) return Scaffold(body: ErrorView(message: _error!, onRetry: _load));
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    if (_isLoading && _task == null) {
+      return const Scaffold(body: LoadingView(message: 'Loading task...'));
+    }
+    if (_error != null && _task == null) {
+      return Scaffold(body: ErrorView(message: _error!, onRetry: _load));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Task')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            TextFormField(controller: _subjectCtrl, decoration: const InputDecoration(labelText: 'Subject'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter subject' : null),
-            const SizedBox(height: 12),
-            TextFormField(controller: _descriptionCtrl, decoration: const InputDecoration(labelText: 'Description')),
-            const SizedBox(height: 20),
-            if (_isLoading) const LoadingView(message: 'Saving task...') else ElevatedButton(onPressed: _save, child: const Text('Save'))
-          ]),
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Edit Task'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.close, color: cs.onSurface),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ===== HEADER =====
+                      Text(
+                        'Edit Task',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Update task details and save changes',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ===== ERROR MESSAGE =====
+                      if (_error != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.errorContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline, color: cs.onErrorContainer, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: TextStyle(color: cs.onErrorContainer, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ===== FORM FIELDS =====
+                      // Subject Field
+                      TextFormField(
+                        controller: _subjectCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Subject *',
+                          hintText: 'e.g. Review Q3 Reports',
+                          prefixIcon: Icon(Icons.task_alt_outlined, color: cs.primary),
+                          filled: true,
+                          fillColor: cs.surfaceVariant.withOpacity(0.3),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.primary, width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Subject is required'
+                            : null,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Description Field
+                      TextFormField(
+                        controller: _descriptionCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Description',
+                          hintText: 'Add details here...',
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Icon(Icons.description_outlined, color: cs.onSurfaceVariant),
+                          ),
+                          filled: true,
+                          fillColor: cs.surfaceVariant.withOpacity(0.3),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.outline.withOpacity(0.1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.primary, width: 2),
+                          ),
+                          alignLabelWithHint: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        maxLines: 3,
+                        minLines: 2,
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // ===== ACTION BUTTONS =====
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            onPressed: _isLoading ? null : _save,
+                            icon: _isLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.check),
+                            label: Text(_isLoading ? 'Saving...' : 'Save Changes'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'user.dart';
+
 class Contact {
   final String id;
   final String firstName;
@@ -17,6 +19,8 @@ class Contact {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? ownerId;
+  final User? owner;
+  final String? accountId;
   final String organizationId;
 
   const Contact({
@@ -38,6 +42,8 @@ class Contact {
     required this.createdAt,
     required this.updatedAt,
     this.ownerId,
+    this.owner,
+    this.accountId,
     required this.organizationId,
   });
 
@@ -76,6 +82,8 @@ class Contact {
       createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
       updatedAt: DateTime.parse(json['updatedAt'] as String? ?? DateTime.now().toIso8601String()),
       ownerId: json['ownerId'] as String?,
+      owner: json['owner'] != null ? User.fromJson(json['owner'] as Map<String, dynamic>) : null,
+      accountId: json['accountId'] as String?,
       organizationId: json['organizationId'] as String? ?? '',
     );
   }
@@ -100,6 +108,7 @@ class Contact {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       if (ownerId != null) 'ownerId': ownerId,
+      if (accountId != null) 'accountId': accountId,
       'organizationId': organizationId,
     };
   }
@@ -131,6 +140,7 @@ class Contact {
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt &&
         other.ownerId == ownerId &&
+        other.owner == owner &&
         other.organizationId == organizationId;
   }
 
@@ -154,6 +164,7 @@ class Contact {
         createdAt.hashCode ^
         updatedAt.hashCode ^
         ownerId.hashCode ^
+        (owner?.hashCode ?? 0) ^
         organizationId.hashCode;
   }
 }

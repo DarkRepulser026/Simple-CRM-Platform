@@ -16,6 +16,7 @@ import 'activity_log_service.dart';
 import 'interaction_service.dart';
 import 'attachments_service.dart';
 import 'invitations_service.dart';
+import 'navigation_service.dart';
 
 final GetIt locator = GetIt.instance;
 
@@ -103,4 +104,7 @@ Future<void> setupLocator() async {
     apiClient: locator<ApiClient>(),
     authService: locator<AuthService>(),
   ));
+
+  // Navigation service
+  locator.registerLazySingleton<NavigationService>(() => NavigationService());
 }

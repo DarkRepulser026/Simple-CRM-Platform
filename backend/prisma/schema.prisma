@@ -17,6 +17,8 @@ model User {
   name         String
   profileImage String?
   googleId     String?  @unique // For Google OAuth
+  passwordHash String?  // For customer password authentication
+  type         UserType @default(STAFF) // STAFF or CUSTOMER
   isActive     Boolean  @default(true)
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
@@ -28,8 +30,10 @@ model User {
   ownedLeads         Lead[]             @relation("LeadOwner")
   ownedTasks         Task[]             @relation("TaskOwner")
   createdTasks       Task[]             @relation("TaskCreator")
+  ownedAccounts      Account[]          @relation("AccountOwner")
   activities         ActivityLog[]
-  tickets            Ticket[]
+  ownedTickets       Ticket[]           @relation("TicketOwner")
+  createdTickets     Ticket[]           @relation("TicketCreator")
   ticketMessages     TicketMessage[]
   attachments        Attachment[]
   createdInvitations Invitation[]
@@ -51,16 +55,17 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  users       UserOrganization[]
-  contacts    Contact[]
-  leads       Lead[]
-  tasks       Task[]
-  accounts    Account[]
-  roles       UserRole[]
-  activities  ActivityLog[]
-  tickets     Ticket[]
-  attachments Attachment[]
-  invitations Invitation[]
+  users            UserOrganization[]
+  contacts         Contact[]
+  leads            Lead[]
+  tasks            Task[]
+  accounts         Account[]
+  roles            UserRole[]
+  activities       ActivityLog[]
+  tickets          Ticket[]
+  attachments      Attachment[]
+  invitations      Invitation[]
+  domainMappings   OrganizationDomain[]
 
   @@map("organizations")
 }
@@ -71,11 +76,13 @@ model UserOrganization {
   userId         String
   organizationId String
   role           UserRoleType @default(VIEWER)
+  userRoleId     String?      // Reference to the specific UserRole for this assignment
   joinedAt       DateTime     @default(now())
 
   // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRole     UserRole? @relation(fields: [userRoleId], references: [id], onDelete: SetNull)
 
   @@unique([userId, organizationId])
   @@map("user_organizations")
@@ -99,16 +106,20 @@ model Contact {
   longitude      Float?
   description    String?
   ownerId        String?
+  accountId      String   // REQUIRED: Every contact must belong to an account
   organizationId String
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
   owner        User?        @relation("ContactOwner", fields: [ownerId], references: [id])
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tasks        Task[]
   leads        Lead[]
 
+  @@unique([email, accountId]) // Ensure email uniqueness per account
   @@map("contacts")
 }
 
@@ -134,6 +145,7 @@ model Lead {
   convertedAccountId     String?
   convertedContactId     String?
   convertedOpportunityId String?
+  deletedAt              DateTime?
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
 
@@ -162,6 +174,9 @@ model Task {
   opportunityId  String?
   caseId         String?
   organizationId String
+  deletedAt      DateTime?
+  cancelledAt    DateTime?
+  cancellationReason String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -180,16 +195,25 @@ model Task {
 model Account {
   id             String   @id @default(cuid())
   name           String
+  domain         String?  // Company website domain
+  industry       String?  // Industry classification
+  size           String?  // Company size (e.g., "1-10", "50-100", etc)
   type           String
   website        String?
   phone          String?
+  ownerId        String?  // Account owner (staff member responsible for this account)
   organizationId String
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
+  owner        User?        @relation("AccountOwner", fields: [ownerId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts     Contact[]    // Contacts within this account
   tasks        Task[]       @relation("TaskAccount")
+  tickets      Ticket[]
+  domainMappings OrganizationDomain[]
 
   @@map("accounts")
 }
@@ -208,7 +232,8 @@ model UserRole {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments    UserOrganization[]
 
   @@unique([organizationId, name])
   @@map("user_roles")
@@ -241,16 +266,26 @@ model Ticket {
   status         TicketStatus   @default(OPEN)
   priority       TicketPriority @default(NORMAL)
   category       String?
-  ownerId        String?
-  organizationId String
+  accountId      String?        // Account associated with this ticket
+  ownerId        String?        // Staff member assigned to the ticket
+  createdById    String?        // Staff member who created the ticket
+  organizationId String         // Organization that owns this ticket
+  slaDeadline    DateTime?      // SLA response/resolution deadline
+  respondedAt    DateTime?      // First response timestamp
+  resolvedAt     DateTime?      // Resolution timestamp
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   // Relations
-  owner        User?           @relation(fields: [ownerId], references: [id])
+  account      Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  owner        User?           @relation("TicketOwner", fields: [ownerId], references: [id])
+  createdBy    User?           @relation("TicketCreator", fields: [createdById], references: [id])
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages     TicketMessage[]
 
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([status])
   @@map("tickets")
 }
 
@@ -271,6 +306,11 @@ model TicketMessage {
 }
 
 // Enums
+enum UserType {
+  STAFF
+  CUSTOMER
+}
+
 enum UserRoleType {
   ADMIN
   MANAGER
@@ -283,6 +323,10 @@ enum Permission {
   CREATE_CONTACTS
   EDIT_CONTACTS
   DELETE_CONTACTS
+  VIEW_ACCOUNTS
+  CREATE_ACCOUNTS
+  EDIT_ACCOUNTS
+  DELETE_ACCOUNTS
   VIEW_LEADS
   CREATE_LEADS
   EDIT_LEADS
@@ -393,3 +437,26 @@ model Invitation {
 
   @@map("invitations")
 }
+
+// OrganizationDomain model - maps email domains to accounts for lead conversion
+model OrganizationDomain {
+  id             String       @id @default(cuid())
+  organizationId String       // Tenant isolation
+  accountId      String?      // Account this domain belongs to
+  domain         String       // e.g., "acme.com", "techstart.io"
+  verified       Boolean      @default(false) // Admin verification status
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account      Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@unique([domain, organizationId]) // Domain unique per tenant
+  @@index([domain])
+  @@index([organizationId])
+  @@index([accountId])
+  @@map("organization_domains")
+}
+

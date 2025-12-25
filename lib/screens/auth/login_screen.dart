@@ -1,14 +1,14 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-import '../../widgets/web_google_sign_in_button.dart';
-
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/auth/auth_service.dart';
 import '../../services/service_locator.dart';
 import '../../services/api/api_config.dart';
+import '../../navigation/app_router.dart';
+// Giả định bạn đã có widget này, nếu chưa hãy dùng code cũ hoặc placeholder
+import '../../widgets/web_google_sign_in_button.dart'; 
 
-/// Login screen that handles Google Sign-In authentication
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -21,7 +21,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   String _version = '';
-  String _buildNumber = '';
+  
+  // Màu chủ đạo cho CRM (Navy Blue & Slate)
+  final Color _primaryColor = const Color(0xFF0F172A); 
+  final Color _accentColor = const Color(0xFF3B82F6);
+  final Color _surfaceColor = const Color(0xFFF8FAFC);
 
   @override
   void initState() {
@@ -32,445 +36,527 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadPackageInfo() async {
     final packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      _version = packageInfo.version;
-      _buildNumber = packageInfo.buildNumber;
-    });
+    if (mounted) {
+      setState(() {
+        _version = packageInfo.version;
+      });
+    }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final success = await _authService.signInWithGoogle();
-      if (success && mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-      } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to sign in with Google. Please try again.';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'An error occurred: ${e.toString()}';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    _handleSignIn(() => _authService.signInWithGoogle());
   }
 
   Future<void> _signInWithGoogleIdToken(String idToken) async {
+    _handleSignIn(() => _authService.signInWithGoogleIdToken(idToken));
+  }
+
+  Future<void> _handleSignIn(Future<bool> Function() signInMethod) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+
     try {
-      final success = await _authService.signInWithGoogleIdToken(idToken);
+      final success = await signInMethod();
       if (success && mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       } else if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to sign in with Google. Please try again.';
-        });
+        setState(() => _errorMessage = 'Authentication failed. Please try again.');
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = 'An error occurred: ${e.toString()}';
-        });
+        setState(() => _errorMessage = 'An error occurred: ${e.toString()}');
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Widget _buildFeatureItem(IconData icon, String label, ThemeData theme) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+  Future<void> _quickLogin(String email, String password) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Direct authentication with email/password (assuming auth service supports this)
+      // This would typically call an email/password authentication method
+      final success = await _authService.signInWithEmailPassword(email, password);
+      if (success && mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      } else if (mounted) {
+        setState(() => _errorMessage = 'Quick login failed. Please ensure the account exists.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Error: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildQuickLoginButton(String label, String email, Color color) {
+    return FilledButton.tonal(
+      onPressed: _isLoading ? null : () => _quickLogin(email, 'password123'),
+      style: FilledButton.styleFrom(
+        backgroundColor: color.withOpacity(0.1),
+        foregroundColor: color,
+        side: BorderSide(color: color.withOpacity(0.3)),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  void _showDebugMenu() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.bug_report, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            const Text('Debug Quick Login'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Development Mode Only',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildQuickLoginButton('Admin', 'admin@example.com', Colors.red),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Manager', 'manager@example.com', Colors.orange),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Agent', 'agent@example.com', Colors.blue),
+            const SizedBox(height: 8),
+            _buildQuickLoginButton('Viewer', 'viewer@example.com', Colors.green),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Sử dụng LayoutBuilder để responsive
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 900) {
+                return _buildDesktopLayout();
+              } else {
+                return _buildMobileLayout();
+              }
+            },
+          ),
+          // Debug menu button (only in debug mode)
+          if (kDebugMode)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _showDebugMenu,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.orange[700],
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.bug_report,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // === DESKTOP / TABLET LAYOUT (Split Screen) ===
+  Widget _buildDesktopLayout() {
+    return Row(
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1565C0).withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFF1565C0).withOpacity(0.15),
-              width: 1,
+        // Left Side: Hero Section (Branding)
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: _primaryColor,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Abstract decorative circles
+                Positioned(
+                  top: -100,
+                  right: -100,
+                  child: Container(
+                    width: 400,
+                    height: 400,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.03),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -50,
+                  left: -50,
+                  child: Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _accentColor.withOpacity(0.1),
+                    ),
+                  ),
+                ),
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(60.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogo(isLight: true),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Manage Your\nCustomer Relationships\nLike a Pro.',
+                        style: TextStyle(
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.2,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'The all-in-one platform to track leads, manage pipelines, and grow your business efficiency.',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.blueGrey[100],
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                      // Feature Pills
+                      Row(
+                        children: [
+                          _buildFeaturePill(Icons.analytics_outlined, 'Analytics'),
+                          const SizedBox(width: 12),
+                          _buildFeaturePill(Icons.people_outline, 'Contacts'),
+                          const SizedBox(width: 12),
+                          _buildFeaturePill(Icons.sync, 'Real-time'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Icon(icon, size: 24, color: const Color(0xFF1565C0)),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF424242),
-            fontWeight: FontWeight.w500,
+        // Right Side: Login Form
+        Expanded(
+          flex: 4,
+          child: Container(
+            color: Colors.white,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.all(40.0),
+                  child: _buildLoginFormContent(),
+                ),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+  // === MOBILE LAYOUT ===
+  Widget _buildMobileLayout() {
+    return Container(
+      color: _surfaceColor,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Spacer(flex: 1),
-
-                // App Logo
+                _buildLogo(isLight: false),
+                const SizedBox(height: 40),
                 Container(
-                  width: 120,
-                  height: 120,
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Image.asset(
-                      'assets/icon/icon.png',
-                      width: 120,
-                      height: 120,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  child: _buildLoginFormContent(),
                 ),
-
-                const SizedBox(height: 40),
-
-                // Professional Title with tagline
-                Column(
-                  children: [
-                    Text(
-                      'CRM Project',
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1A1A1A),
-                        letterSpacing: -1.2,
-                        fontSize: 36,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF1565C0).withOpacity(0.1),
-                            const Color(0xFF2196F3).withOpacity(0.05),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF1565C0).withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'PROFESSIONAL EDITION',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF1565C0),
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Error Message
-                if (_errorMessage != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: theme.colorScheme.onErrorContainer,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                // Professional Feature Highlights
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  margin: const EdgeInsets.only(bottom: 32),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAFAFA),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFE0E0E0),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildFeatureItem(
-                        Icons.people_outline,
-                        'Contacts',
-                        theme,
-                      ),
-                      _buildFeatureItem(Icons.trending_up, 'Analytics', theme),
-                      _buildFeatureItem(Icons.task_alt, 'Pipeline', theme),
-                    ],
-                  ),
-                ),
-
-                // Google Sign In Button
-                if (kIsWeb)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Column(
-                      children: [
-                        WebGoogleSignInButton(
-                          clientId: ApiConfig.googleClientId,
-                          onSuccess: (idToken) async {
-                            await _signInWithGoogleIdToken(idToken);
-                          },
-                          onError: (error) {
-                            setState(() {
-                              _errorMessage = 'Sign-in error: $error';
-                              _isLoading = false;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Container(
-                      width: double.infinity,
-                      height: 60,
-                      constraints: const BoxConstraints(
-                        maxWidth: 400,
-                      ),
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _signInWithGoogle,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF1A1A1A),
-                          elevation: 0,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: const Color(0xFF1565C0).withOpacity(0.2),
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        icon: _isLoading
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF1565C0),
-                                  ),
-                                ),
-                              )
-                            : const FaIcon(
-                                FontAwesomeIcons.google,
-                                size: 20,
-                                color: Color(0xFF4285F4),
-                              ),
-                        label: Text(
-                          _isLoading
-                              ? 'Signing you in...'
-                              : 'Sign in with Google',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: _isLoading
-                                ? const Color(0xFF666666)
-                                : const Color(0xFF1A1A1A),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: 32),
-
-                // Professional Footer
-                Column(
-                  children: [
-                    // Security Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF4CAF50).withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.security,
-                            size: 16,
-                            color: const Color(0xFF4CAF50),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Enterprise-grade security',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF4CAF50),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Terms and Privacy
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF666666),
-                            height: 1.5,
-                            fontSize: 12,
-                          ),
-                          children: [
-                            const TextSpan(
-                              text: 'By signing in, you agree to our ',
-                            ),
-                            TextSpan(
-                              text: 'Terms of Service',
-                              style: TextStyle(
-                                color: const Color(0xFF1565C0),
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.underline,
-                                decorationColor: const Color(
-                                  0xFF1565C0,
-                                ).withOpacity(0.5),
-                              ),
-                            ),
-                            const TextSpan(text: ' and '),
-                            TextSpan(
-                              text: 'Privacy Policy',
-                              style: TextStyle(
-                                color: const Color(0xFF1565C0),
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.underline,
-                                decorationColor: const Color(
-                                  0xFF1565C0,
-                                ).withOpacity(0.5),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
                 const SizedBox(height: 24),
-
-                // Version information
-                if (_version.isNotEmpty && _buildNumber.isNotEmpty)
+                if (_version.isNotEmpty)
                   Text(
-                    'Version $_version ($_buildNumber)',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF999999),
-                      fontSize: 11,
-                    ),
+                    'Version $_version',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
-
-                const Spacer(flex: 1),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  // === SHARED WIDGETS ===
+
+  Widget _buildLogo({required bool isLight}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: isLight ? Colors.white : _primaryColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+               if (!isLight) BoxShadow(color: _primaryColor.withOpacity(0.3), blurRadius: 10, offset: Offset(0,4))
+            ]
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            // Fallback icon nếu asset lỗi
+            child: Image.asset(
+              'assets/icon/icon.png',
+              fit: BoxFit.cover,
+              errorBuilder: (c, o, s) => Icon(Icons.business, color: isLight ? _primaryColor : Colors.white),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'CRM PROJECT',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: isLight ? Colors.white : _primaryColor,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _accentColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'ENTERPRISE',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isLight ? _accentColor : _primaryColor,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeaturePill(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginFormContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Welcome Back',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+            color: _primaryColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Sign in to access your dashboard',
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        if (_errorMessage != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red[100]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(color: Colors.red[900], fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Google Button Wrapper
+        if (kIsWeb)
+          WebGoogleSignInButton(
+            clientId: ApiConfig.googleClientId,
+            onSuccess: (idToken) => _signInWithGoogleIdToken(idToken),
+            onError: (error) {
+               setState(() {
+                 _errorMessage = 'Sign-in error: $error';
+                 _isLoading = false;
+               });
+            },
+          )
+        else
+          SizedBox(
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : _signInWithGoogle,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black87,
+                elevation: 0,
+                side: BorderSide(color: Colors.grey[300]!),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: _isLoading 
+                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                : FaIcon(FontAwesomeIcons.google, color: Colors.red[600], size: 20),
+              label: Text(
+                _isLoading ? 'Signing in...' : 'Sign in with Google',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 32),
+
+        // Footer / Terms
+        Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lock_outline, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 6),
+                Text(
+                  'Secured by Enterprise SSO',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 4,
+              children: [
+                Text('By continuing, you agree to our', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                InkWell(
+                  onTap: () {}, // Add logic
+                  child: Text('Terms', style: TextStyle(color: _accentColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+                Text('&', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                InkWell(
+                  onTap: () {}, // Add logic
+                  child: Text('Privacy Policy', style: TextStyle(color: _accentColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            )
+          ],
+        ),
+        
+        const SizedBox(height: 24),
+      ],
     );
   }
 }

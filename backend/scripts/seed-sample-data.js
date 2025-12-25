@@ -4,12 +4,24 @@ import prisma from '../lib/prismaClient.js';
 dotenv.config();
 
 async function main() {
-  const orgId = process.env.ORG_ID || '';
+  let orgId = process.env.ORG_ID || '';
   const seedOwnerEmail = process.env.ADMIN_EMAIL || 'minecraftthanhloi@gmail.com';
 
+  // If no ORG_ID provided, find the first organization
   if (!orgId) {
-    console.error('Please set ORG_ID environment variable or edit the script to point to the target organization.');
-    process.exit(1);
+    try {
+      const org = await prisma.organization.findFirst();
+      if (org) {
+        orgId = org.id;
+        console.log('Found organization:', orgId);
+      } else {
+        console.error('No organization found in database. Please create an organization first.');
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error('Error finding organization:', err.message);
+      process.exit(1);
+    }
   }
 
   try {
@@ -53,10 +65,29 @@ async function main() {
       task1 = await prisma.task.create({ data: { subject: 'Follow up with Alice', description: 'Call Alice to discuss requirements', ownerId: owner.id, organizationId: orgId } });
     }
 
-    // Create sample ticket
-    let ticket1 = await prisma.ticket.findFirst({ where: { subject: 'Login issue', organizationId: orgId } });
-    if (!ticket1) {
-      ticket1 = await prisma.ticket.create({ data: { subject: 'Login issue', description: 'Customer cannot sign in', ownerId: owner.id, organizationId: orgId } });
+    // Create sample tickets with different statuses and priorities
+    const sampleTickets = [
+      { subject: 'Login issue', description: 'Customer cannot sign in', status: 'OPEN', priority: 'URGENT' },
+      { subject: 'Payment processing error', description: 'Transaction failed', status: 'IN_PROGRESS', priority: 'HIGH' },
+      { subject: 'UI rendering glitch', description: 'Page elements not displaying correctly', status: 'RESOLVED', priority: 'NORMAL' },
+      { subject: 'Database migration failed', description: 'Schema update incomplete', status: 'CLOSED', priority: 'LOW' },
+      { subject: 'API rate limit exceeded', description: 'Need to increase quota', status: 'OPEN', priority: 'HIGH' },
+      { subject: 'Email notification not sent', description: 'Customer did not receive confirmation', status: 'IN_PROGRESS', priority: 'NORMAL' },
+    ];
+
+    for (const ticketData of sampleTickets) {
+      const existing = await prisma.ticket.findFirst({ 
+        where: { subject: ticketData.subject, organizationId: orgId } 
+      });
+      if (!existing) {
+        await prisma.ticket.create({ 
+          data: { 
+            ...ticketData,
+            ownerId: owner.id, 
+            organizationId: orgId 
+          } 
+        });
+      }
     }
 
     // Log activity entries

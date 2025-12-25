@@ -70,10 +70,8 @@ class TicketsService {
     int limit = 20,
     String? status,
     String? priority,
-    String? type,
-    String? assignedToId,
-    String? customerId,
-    bool? overdue,
+    String? ownerId,
+    String? accountId,
     String? search,
   }) async {
     // Check authentication
@@ -92,17 +90,11 @@ class TicketsService {
     if (priority != null && priority.isNotEmpty) {
       queryParams['priority'] = priority;
     }
-    if (type != null && type.isNotEmpty) {
-      queryParams['type'] = type;
+    if (ownerId != null && ownerId.isNotEmpty) {
+      queryParams['ownerId'] = ownerId;
     }
-    if (assignedToId != null && assignedToId.isNotEmpty) {
-      queryParams['assignedToId'] = assignedToId;
-    }
-    if (customerId != null && customerId.isNotEmpty) {
-      queryParams['customerId'] = customerId;
-    }
-    if (overdue != null) {
-      queryParams['overdue'] = overdue.toString();
+    if (accountId != null && accountId.isNotEmpty) {
+      queryParams['accountId'] = accountId;
     }
     if (search != null && search.isNotEmpty) {
       queryParams['search'] = search;
@@ -112,9 +104,10 @@ class TicketsService {
 
     final res = await _apiClient.get(uri.toString(), headers: await _getAuthHeaders());
     if (res.isError) return Result.error(res.error);
-    final jsonList = res.value as List<dynamic>;
-    final tickets = jsonList.map((t) => Ticket.fromJson(t as Map<String, dynamic>)).toList();
-    return Result.success(TicketsResponse(tickets: tickets));
+    
+    // Parse response as JSON object with tickets and pagination
+    final jsonData = res.value as Map<String, dynamic>;
+    return Result.success(TicketsResponse.fromJson(jsonData));
   }
 
   /// Get a single ticket by ID
@@ -193,10 +186,10 @@ class TicketsService {
 
     final url = '${ApiConfig.tickets}/$ticketId/assign';
 
-    return _apiClient.post<Ticket>(
+    return _apiClient.put<Ticket>(
       url,
       headers: await _getAuthHeaders(),
-      body: {'assignedToId': agentId},
+      body: {'ownerId': agentId},
       fromJson: Ticket.fromJson,
     );
   }

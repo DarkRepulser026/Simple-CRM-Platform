@@ -40,10 +40,18 @@ class App extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/', // AuthWrapper will handle initial navigation
+      initialRoute: '/',
       routes: AppRouter.getRoutes(),
       onGenerateRoute: AppRouter.onGenerateRoute,
       home: const AuthWrapper(),
+      // Performance optimizations for smooth transitions
+      builder: (context, child) {
+        // Use a ScrollBehavior that doesn't highlight on scroll
+        return ScrollConfiguration(
+          behavior: const ScrollBehavior().copyWith(scrollbars: false),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

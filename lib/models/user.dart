@@ -5,6 +5,7 @@ class User {
   final String? profileImage;
   final String? googleId;
   final bool isActive;
+  final int tokenVersion;
   final String? role;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -16,6 +17,7 @@ class User {
     this.profileImage,
     this.googleId,
     this.isActive = true,
+    this.tokenVersion = 0,
     this.role,
     this.createdAt,
     this.updatedAt,
@@ -29,6 +31,7 @@ class User {
       profileImage: json['profileImage'] as String?,
       googleId: json['googleId'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      tokenVersion: json['tokenVersion'] as int? ?? 0,
       role: json['role'] as String?,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
@@ -43,6 +46,7 @@ class User {
       if (profileImage != null) 'profileImage': profileImage,
       if (googleId != null) 'googleId': googleId,
       'isActive': isActive,
+      'tokenVersion': tokenVersion,
       if (role != null) 'role': role,
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
@@ -64,12 +68,13 @@ class User {
         other.profileImage == profileImage &&
         other.googleId == googleId &&
         other.isActive == isActive &&
+        other.tokenVersion == tokenVersion &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt;
   }
 
   @override
   int get hashCode {
-    return id.hashCode ^ email.hashCode ^ name.hashCode ^ profileImage.hashCode ^ googleId.hashCode ^ isActive.hashCode ^ (createdAt?.hashCode ?? 0) ^ (updatedAt?.hashCode ?? 0);
+    return id.hashCode ^ email.hashCode ^ name.hashCode ^ profileImage.hashCode ^ googleId.hashCode ^ isActive.hashCode ^ tokenVersion.hashCode ^ (createdAt?.hashCode ?? 0) ^ (updatedAt?.hashCode ?? 0);
   }
 }

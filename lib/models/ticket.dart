@@ -1,18 +1,16 @@
 /// Ticket status enumeration
 enum TicketStatus {
   open('Open'),
-  pending('Pending'),
   inProgress('In Progress'),
   resolved('Resolved'),
-  closed('Closed'),
-  cancelled('Cancelled');
+  closed('Closed');
 
   const TicketStatus(this.value);
   final String value;
 
   static TicketStatus fromString(String value) {
     return TicketStatus.values.firstWhere(
-      (status) => status.value == value,
+      (status) => status.name == value.toLowerCase(),
       orElse: () => TicketStatus.open,
     );
   }
@@ -23,15 +21,14 @@ enum TicketPriority {
   low('Low'),
   normal('Normal'),
   high('High'),
-  urgent('Urgent'),
-  critical('Critical');
+  urgent('Urgent');
 
   const TicketPriority(this.value);
   final String value;
 
   static TicketPriority fromString(String value) {
     return TicketPriority.values.firstWhere(
-      (priority) => priority.value == value,
+      (priority) => priority.name == value.toLowerCase(),
       orElse: () => TicketPriority.normal,
     );
   }
@@ -67,18 +64,16 @@ class Ticket {
   final String? description;
   final TicketStatus status;
   final TicketPriority priority;
-  final TicketType type;
-  final String? customerId;
-  final String? contactId;
+  final String? category;
   final String? accountId;
-  final String? assignedToId;
+  final String? contactId;
+  final String? ownerId;
+  final String? ownerName;
+  final String? ownerEmail;
   final String? createdById;
+  final String? createdByName;
+  final String? createdByEmail;
   final String organizationId;
-  final DateTime? dueDate;
-  final DateTime? resolvedAt;
-  final DateTime? closedAt;
-  final int? satisfactionRating; // 1-5 scale
-  final String? satisfactionFeedback;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -88,38 +83,19 @@ class Ticket {
     this.description,
     required this.status,
     required this.priority,
-    required this.type,
-    this.customerId,
-    this.contactId,
+    this.category,
     this.accountId,
-    this.assignedToId,
+    this.contactId,
+    this.ownerId,
+    this.ownerName,
+    this.ownerEmail,
     this.createdById,
+    this.createdByName,
+    this.createdByEmail,
     required this.organizationId,
-    this.dueDate,
-    this.resolvedAt,
-    this.closedAt,
-    this.satisfactionRating,
-    this.satisfactionFeedback,
     required this.createdAt,
     required this.updatedAt,
   });
-
-  /// Computed property to check if ticket is overdue
-  bool get isOverdue =>
-      dueDate != null &&
-      dueDate!.isBefore(DateTime.now()) &&
-      status != TicketStatus.resolved &&
-      status != TicketStatus.closed;
-
-  /// Computed property to check if ticket is resolved
-  bool get isResolved =>
-      status == TicketStatus.resolved || status == TicketStatus.closed;
-
-  /// Computed property to get resolution time in hours
-  Duration? get resolutionTime {
-    if (resolvedAt == null) return null;
-    return resolvedAt!.difference(createdAt);
-  }
 
   /// Computed property to get age in days
   int get ageInDays => DateTime.now().difference(createdAt).inDays;
@@ -130,20 +106,18 @@ class Ticket {
       id: json['id'] ?? '',
       subject: json['subject'] ?? '',
       description: json['description'],
-      status: TicketStatus.fromString(json['status'] ?? 'Open'),
-      priority: TicketPriority.fromString(json['priority'] ?? 'Normal'),
-      type: TicketType.fromString(json['type'] ?? 'Question'),
-      customerId: json['customerId'],
-      contactId: json['contactId'],
+      status: TicketStatus.fromString(json['status'] ?? 'OPEN'),
+      priority: TicketPriority.fromString(json['priority'] ?? 'NORMAL'),
+      category: json['category'],
       accountId: json['accountId'],
-      assignedToId: json['assignedToId'],
+      contactId: json['contactId'],
+      ownerId: json['ownerId'],
+      ownerName: json['owner'] != null ? json['owner']['name'] : null,
+      ownerEmail: json['owner'] != null ? json['owner']['email'] : null,
       createdById: json['createdById'],
+      createdByName: json['createdBy'] != null ? json['createdBy']['name'] : null,
+      createdByEmail: json['createdBy'] != null ? json['createdBy']['email'] : null,
       organizationId: json['organizationId'] ?? '',
-      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
-      resolvedAt: json['resolvedAt'] != null ? DateTime.parse(json['resolvedAt']) : null,
-      closedAt: json['closedAt'] != null ? DateTime.parse(json['closedAt']) : null,
-      satisfactionRating: json['satisfactionRating'],
-      satisfactionFeedback: json['satisfactionFeedback'],
       createdAt: DateTime.parse(
         json['createdAt'] ?? DateTime.now().toIso8601String(),
       ),
@@ -161,18 +135,9 @@ class Ticket {
       'description': description,
       'status': status.value,
       'priority': priority.value,
-      'type': type.value,
-      'customerId': customerId,
-      'contactId': contactId,
-      'accountId': accountId,
-      'assignedToId': assignedToId,
-      'createdById': createdById,
+      'category': category,
+      'ownerId': ownerId,
       'organizationId': organizationId,
-      'dueDate': dueDate?.toIso8601String(),
-      'resolvedAt': resolvedAt?.toIso8601String(),
-      'closedAt': closedAt?.toIso8601String(),
-      'satisfactionRating': satisfactionRating,
-      'satisfactionFeedback': satisfactionFeedback,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -185,18 +150,16 @@ class Ticket {
     String? description,
     TicketStatus? status,
     TicketPriority? priority,
-    TicketType? type,
-    String? customerId,
-    String? contactId,
+    String? category,
     String? accountId,
-    String? assignedToId,
+    String? contactId,
+    String? ownerId,
+    String? ownerName,
+    String? ownerEmail,
     String? createdById,
+    String? createdByName,
+    String? createdByEmail,
     String? organizationId,
-    DateTime? dueDate,
-    DateTime? resolvedAt,
-    DateTime? closedAt,
-    int? satisfactionRating,
-    String? satisfactionFeedback,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -206,18 +169,16 @@ class Ticket {
       description: description ?? this.description,
       status: status ?? this.status,
       priority: priority ?? this.priority,
-      type: type ?? this.type,
-      customerId: customerId ?? this.customerId,
-      contactId: contactId ?? this.contactId,
+      category: category ?? this.category,
       accountId: accountId ?? this.accountId,
-      assignedToId: assignedToId ?? this.assignedToId,
+      contactId: contactId ?? this.contactId,
+      ownerId: ownerId ?? this.ownerId,
+      ownerName: ownerName ?? this.ownerName,
+      ownerEmail: ownerEmail ?? this.ownerEmail,
       createdById: createdById ?? this.createdById,
+      createdByName: createdByName ?? this.createdByName,
+      createdByEmail: createdByEmail ?? this.createdByEmail,
       organizationId: organizationId ?? this.organizationId,
-      dueDate: dueDate ?? this.dueDate,
-      resolvedAt: resolvedAt ?? this.resolvedAt,
-      closedAt: closedAt ?? this.closedAt,
-      satisfactionRating: satisfactionRating ?? this.satisfactionRating,
-      satisfactionFeedback: satisfactionFeedback ?? this.satisfactionFeedback,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -235,6 +196,6 @@ class Ticket {
 
   @override
   String toString() {
-    return 'Ticket(id: $id, subject: $subject, status: ${status.value}, priority: ${priority.value})';
+    return 'Ticket(id: $id, subject: $subject, status: ${status.value})';
   }
 }

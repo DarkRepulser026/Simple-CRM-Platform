@@ -90,26 +90,29 @@ class ApiClient {
     int retryCount = 0,
   }) async {
     try {
-      debugPrint('ApiClient: Performing $method $url');
-      final uri = Uri.parse(url);
+      // Handle relative URLs by prepending baseUrl
+      String fullUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        final baseUrl = ApiConfig.baseUrl;
+        // Ensure no double slashes
+        final cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        final cleanRelativeUrl = url.startsWith('/') ? url : '/$url';
+        fullUrl = '$cleanBaseUrl$cleanRelativeUrl';
+      }
+
+      final uri = Uri.parse(fullUrl);
       final requestHeaders = await _buildHeaders(headers);
       final requestBody = _encodeBody(body);
 
       final request = http.Request(method, uri)
         ..headers.addAll(requestHeaders)
         ..body = requestBody ?? '';
-      if (kDebugMode) {
-        debugPrint('Request headers for $method $url: $requestHeaders');
-      }
 
       final streamedResponse = await _httpClient
           .send(request)
           .timeout(ApiConfig.receiveTimeout);
 
       final response = await http.Response.fromStream(streamedResponse);
-      if (kDebugMode) {
-        debugPrint('Response for $method $url: ${response.statusCode} ${response.body}');
-      }
 
       // Check if we should retry on certain errors
       if (_shouldRetry(response.statusCode) && retryCount < ApiConfig.maxRetries) {
@@ -232,7 +235,7 @@ class ApiClient {
 
           final jsonData = jsonDecode(response.body);
           if (fromJson != null) {
-            return Result.success(fromJson(jsonData));
+            return Result.success(fromJson(jsonData as Map<String, dynamic>));
           } else if (jsonData is Map<String, dynamic>) {
             return Result.success(jsonData as T);
           } else {
