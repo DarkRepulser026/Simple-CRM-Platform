@@ -385,16 +385,3 @@ When using Docker, update `.env` with:
 ```bash
 DATABASE_URL=postgresql://postgres:mypassword@localhost:5432/main_project
 ```
-
-## Contributing
-
-- Create feature branches: `git checkout -b feat/feature-name`
-- Run tests before committing
-- Follow code style guidelines (run formatters)
-- Create pull request with description
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-## License
-
-ISC
