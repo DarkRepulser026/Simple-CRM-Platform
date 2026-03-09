@@ -1,387 +1,84 @@
-# Main Project - CRM Application
+# Main Project - CRM Platform
 
-A full-stack CRM application with Flutter frontend and Node.js/Express backend. Manage contacts, leads, accounts, and support tickets.
+A full-stack CRM application serving as a unified contact, lead, account, and ticket management system. The backend runs on Node.js/Express with PostgreSQL, while the frontend is built with Flutter and compiles to web, mobile, and desktop.
 
-## Table of Contents
+## Interesting Techniques
 
-- [Quick Start](#quick-start)
-- [System Requirements](#system-requirements)
-- [Installation](#installation)
-- [Running the Application](#running-the-application)
-- [Development Workflow](#development-workflow)
-- [Database Management](#database-management)
-- [Architecture](#architecture)
-- [Contributing](#contributing)
+This project demonstrates several production-grade patterns:
 
-## Quick Start
+- **[Token versioning for auth revocation](https://tools.ietf.org/html/rfc7519)**: Implements logout-all by incrementing a `tokenVersion` counter on the user record. [JWT](https://tools.ietf.org/html/rfc7519) payloads include this version, and the server validates it on each request. This allows instantaneous revocation of all sessions without token blacklists or cache management.
 
-### Fastest Way to Run (All in One)
+- **[Service locator pattern with lazy singletons](https://en.wikipedia.org/wiki/Service_locator_pattern)**: Uses `get_it` for dependency injection in Flutter. Services are registered as lazy singletons and initialized on-demand, keeping startup time fast while ensuring single instances throughout the app lifecycle.
 
-```bash
-# Terminal 1 - Backend
-npm run dev:backend
+- **[Platform-specific conditional compilation](https://dart.dev/guides/libraries/library-private-elements)**: Leverages Dart's `if (dart.library.html)` syntax to provide web-specific implementations (Google Sign-In) while maintaining a single codebase across Android, iOS, macOS, Windows, and Linux.
 
-# Terminal 2 - Frontend
-npm run dev:frontend
-```
+- **[Role-based access control with custom permissions](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)**: Defines custom roles per organization with granular permission assignment. The server checks both the user's role and the specific permissions before allowing operations.
 
-Or use VS Code task:
-```bash
-Dev: Start both      # Runs backend and frontend in parallel
-```
+- **[Rate limiting on authentication endpoints](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html#protect-against-brute-force-attacks)**: Uses `express-rate-limit` to cap failed login attempts to 5 per 15-minute window per IP, defending against credential stuffing.
 
-## System Requirements
+- **[Material Design 3 theming with color seeding](https://material.io/blog/material-3-for-flutter)**: Generates a full Material Design color system from a single seed color, creating a cohesive, accessible design system across the entire Flutter app.
 
-### Backend
-- **Node.js** 18.x or later
-- **npm** or **yarn**
-- **PostgreSQL** 14 or later
-- **.env file** with database credentials
-
-### Frontend
-- **Flutter SDK** 3.8.1 or later
-- **Dart SDK** (included with Flutter)
-- **Chrome browser** (for web development)
-- Optional: Android Studio, Xcode, Visual Studio for other platforms
-
-### Verification
-
-```bash
-# Check Flutter setup
-flutter doctor
-
-# Check Node.js
-node --version
-npm --version
-
-# Check PostgreSQL
-psql --version
-```
-
-## Installation
-
-### 1. Clone Repository
-
-```bash
-git clone <repository-url>
-cd main_project
-```
-
-### 2. Database Setup (Docker)
-
-```bash
-cd backend
-
-# Start PostgreSQL container
-docker-compose up -d
-
-# Verify PostgreSQL is running
-docker-compose ps
-```
-
-**Docker Credentials (from docker-compose.yml):**
-- Username: `postgres`
-- Password: `mypassword`
-- Database: `main_project`
-- Port: `5432`
-
-### 3. Backend Setup
-
-```bash
-cd backend
-
-# Install Node dependencies
-npm install
-
-# Create .env file with database URL
-echo "DATABASE_URL=postgresql://postgres:mypassword@localhost:5432/main_project" > .env
-echo "GOOGLE_CLIENT_ID=your_google_client_id" >> .env
-echo "GOOGLE_CLIENT_SECRET=your_google_client_secret" >> .env
-echo "PORT=3001" >> .env
-```
-
-**Required Environment Variables:**
-- `DATABASE_URL`: PostgreSQL connection string (matches docker-compose)
-- `GOOGLE_CLIENT_ID`: Google OAuth Client ID
-- `GOOGLE_CLIENT_SECRET`: Google OAuth Client Secret
-- `PORT`: Backend port (default: 3001)
-
-### 4. Initialize Database
-
-```bash
-cd backend
-
-# Run migrations
-npm run prisma:migrate
-
-# Seed initial data
-npm run seed-production
-
-# View database (optional)
-npm run prisma:studio
-```
-
-### 5. Frontend Setup
-
-```bash
-# From project root
-flutter pub get
-```
-
-## Running the Application
-
-### Option 1: VS Code Tasks (Recommended)
-
-```bash
-# Open command palette (Ctrl+Shift+P or Cmd+Shift+P)
-> Tasks: Run Task
-> Dev: Start both
-```
-
-This starts:
-- Backend on `http://localhost:3001`
-- Frontend on `http://localhost:3000`
-
-### Option 2: Manual - Multiple Terminals
-
-**Terminal 1 - Backend:**
-```bash
-npm run dev:backend
-# Runs on http://localhost:3001
-# Watch mode enabled - auto-restarts on file changes
-```
-
-**Terminal 2 - Frontend:**
-```bash
-npm run dev:frontend
-# Runs on http://localhost:3000
-# Hot reload enabled
-```
-
-### Option 3: Production Build
+## Technologies & Libraries
 
 **Backend:**
-```bash
-cd backend
-npm start
-```
+- [Express.js v5.1.0](https://expressjs.com/) — minimalist web framework
+- [Prisma v6.18.0](https://www.prisma.io/) — type-safe ORM for PostgreSQL
+- [Passport.js](http://www.passportjs.org/) — modular authentication; configured with Google OAuth 2.0
+- [bcryptjs](https://www.npmjs.com/package/bcryptjs) — password hashing with salt rounds
+- [jsonwebtoken (JWT)](https://www.npmjs.com/package/jsonwebtoken) — stateless auth tokens
+- [express-rate-limit](https://www.npmjs.com/package/express-rate-limit) — middleware for rate limiting
+- [Nodemailer](https://nodemailer.com/about/) — email delivery; used for invitations and notifications
+- [Multer](https://www.npmjs.com/package/multer) — multipart file uploads
+- Testing: Mocha, Chai, Supertest
 
-**Frontend - Web:**
-```bash
-flutter build web --release
-# Outputs to build/web/
-# Serve with: python -m http.server 3000
-```
-
-**Frontend - Other Platforms:**
-```bash
-flutter build apk          # Android
-flutter build ios          # iOS (macOS only)
-flutter build windows      # Windows desktop
-flutter build macos        # macOS desktop
-flutter build linux        # Linux desktop
-```
-
-## Development Workflow
-
-### Code Quality
-
-```bash
-# Frontend
-flutter analyze           # Lint code
-flutter format .          # Format Dart code
-
-# Backend
-npm run lint             # Check lint rules
-npm run format           # Format JavaScript code
-```
-
-### Testing
-
-```bash
-# Frontend
-flutter test
-
-# Backend
-npm test                 # Run all tests
-npm run test:watch      # Watch mode
-```
-
-### Common Development Tasks
-
-**View Database:**
-```bash
-cd backend
-npm run prisma:studio
-# Opens at http://localhost:5555
-```
-
-**Check User Permissions:**
-```bash
-cd backend
-node scripts/check-permissions.js
-```
-
-**Test API Endpoints:**
-```bash
-cd backend
-node scripts/test-api.js
-```
-
-## Database Management
-
-### Seeding Data
-
-```bash
-cd backend
-
-# Seed production data
-npm run seed-production
-```
-
-### Database Maintenance
-
-```bash
-# Reset entire database
-npm run db:reset
-
-# Generate Prisma client
-npm run prisma:generate
-
-# Create new migration
-npm run prisma:migrate -- --name migration_name
-```
+**Frontend:**
+- [Flutter SDK v3.8.1](https://flutter.dev) — cross-platform framework compiling to web, iOS, Android, macOS, Windows, Linux
+- [Material Design 3](https://material.io/blog/material-3-for-flutter) — design system and components
+- [get_it](https://pub.dev/packages/get_it) — service locator for dependency injection
+- [google_sign_in](https://pub.dev/packages/google_sign_in) — OAuth 2.0 authentication
+- [http](https://pub.dev/packages/http) — HTTP client for API calls
+- [jwt_decoder](https://pub.dev/packages/jwt_decoder) — JWT token parsing
+- [Font Awesome Flutter](https://pub.dev/packages/font_awesome_flutter) — icon library
+- [fl_chart](https://pub.dev/packages/fl_chart) — charting and visualizations
+- [file_picker](https://pub.dev/packages/file_picker) — native file selection
+- [shared_preferences](https://pub.dev/packages/shared_preferences) — local persistent storage
+- [intl](https://pub.dev/packages/intl) — internationalization and localization
 
 ## Project Structure
 
 ```
 main_project/
-├── backend/                 # Node.js/Express API
-│   ├── routes/
-│   ├── middleware/
-│   ├── services/
-│   ├── lib/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── migrations/
-│   ├── scripts/
-│   ├── app.js
-│   ├── server.js
-│   └── package.json
-├── lib/                     # Flutter application
-│   ├── screens/
-│   ├── widgets/
-│   ├── services/
-│   ├── models/
-│   ├── navigation/
-│   └── main.dart
-├── pubspec.yaml            # Flutter dependencies
-└── ARCHITECTURE.md         # System architecture details
+├── backend/                          # Node.js/Express API server
+│   ├── middleware/                   # Auth, permissions, validation, rate limiting
+│   ├── routes/                       # Endpoint handlers (auth, CRM, tickets, admin)
+│   ├── services/                     # Business logic and data operations
+│   ├── prisma/                       # Database schema and migrations
+│   └── scripts/                      # Utilities for seeding and management
+├── lib/                              # Flutter source code
+│   ├── screens/                      # UI screens (auth, dashboard, contacts, etc.)
+│   ├── widgets/                      # Reusable UI components
+│   ├── services/                     # API clients, auth, storage, domain logic
+│   ├── navigation/                   # Routing and route guards
+│   ├── models/                       # Data classes and serialization
+│   └── utils/                        # Helpers and utilities
+├── web/                              # Flutter web artifacts
+├── android/, ios/, macos/, windows/, linux/  # Platform-specific code
+├── pubspec.yaml                      # Flutter dependencies
+├── package.json                      # Root-level npm scripts for coordination
+└── ARCHITECTURE.md                   # Detailed system design documentation
 ```
 
-## Architecture
+**Key backend directories:**
+- [middleware/](backend/middleware) — Auth token validation, permission checks, request validation, rate limiting
+- [routes/auth/](backend/routes/auth) — Staff/customer login, Google OAuth, logout, token refresh, invitations
+- [routes/crm/](backend/routes/crm) — Contacts, leads, accounts (ownership, soft-delete support)
+- [routes/tickets/](backend/routes/tickets) — Support ticket lifecycle and messaging
+- [prisma/](backend/prisma) — PostgreSQL schema, migration history, seed data scripts
+- [services/](backend/services) — Shared business logic (activity logging, soft-delete operations)
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system architecture, database schema, and API documentation.
-
-## Troubleshooting
-
-### Backend Issues
-
-**Port already in use:**
-```bash
-# Find process on port 3001
-lsof -i :3001                    # macOS/Linux
-netstat -ano | findstr :3001     # Windows
-
-# Kill process
-kill -9 <PID>
-```
-
-**Database connection failed:**
-- Verify PostgreSQL Docker container is running: `docker-compose ps`
-- Check `DATABASE_URL` in `.env` matches docker-compose credentials
-- Restart containers: `docker-compose restart`
-
-**Docker PostgreSQL issues:**
-```bash
-cd backend
-
-# View logs
-docker-compose logs postgres
-
-# Restart containers
-docker-compose restart
-
-# Remove and recreate (fresh database)
-docker-compose down -v
-docker-compose up -d
-```
-
-**Migration errors:**
-```bash
-cd backend
-npm run prisma:migrate -- --skip-generate
-```
-
-### Frontend Issues
-
-**Chrome not found:**
-```bash
-flutter config --chrome-device-vm-service-port=54321
-flutter run -d chrome
-```
-
-**Port 3000 already in use:**
-```bash
-flutter run -d chrome --web-port=3001
-```
-
-**Hot reload not working:**
-```bash
-flutter run -d chrome --no-fast-start
-```
-
-## Docker
-
-The project includes Docker Compose for PostgreSQL database management.
-
-### Docker Commands
-
-```bash
-cd backend
-
-# Start PostgreSQL container
-docker-compose up -d
-
-# View running containers
-docker-compose ps
-
-# View logs
-docker-compose logs postgres
-
-# Stop containers
-docker-compose down
-
-# Remove containers and volumes (reset database)
-docker-compose down -v
-
-# Rebuild containers
-docker-compose up -d --build
-```
-
-### Docker Compose Configuration
-
-- **PostgreSQL Image**: postgres:15
-- **Container Name**: main_project_db
-- **Username**: postgres
-- **Password**: mypassword
-- **Database**: main_project
-- **Port**: 5432
-- **Data Volume**: pgdata (persists between restarts)
-
-### Environment Variables for Docker
-
-When using Docker, update `.env` with:
-```bash
-DATABASE_URL=postgresql://postgres:mypassword@localhost:5432/main_project
-```
+**Key frontend directories:**
+- [lib/screens/](lib/screens) — Full pages (LoginScreen, DashboardScreen, ContactsScreen, etc.)
+- [lib/widgets/](lib/widgets) — Reusable components (ActivityLogWidget, RoleAssignmentWidget, PaginatedListView)
+- [lib/services/](lib/services) — Dependency-injected services for API calls, authentication, domain operations
+- [lib/navigation/](lib/navigation) — Route definitions and guards (e.g., requiring auth before dashboard)
+- [lib/models/](lib/models) — Serializable data classes with JSON conversion
