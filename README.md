@@ -1,8 +1,8 @@
-# Main Project - CRM Platform
+# CRM Platform
 
 A full-stack CRM application serving as a unified contact, lead, account, and ticket management system. The backend runs on Node.js/Express with PostgreSQL, while the frontend is built with Flutter and compiles to web, mobile, and desktop.
 
-## Interesting Techniques
+## Techniques
 
 This project demonstrates several production-grade patterns:
 
